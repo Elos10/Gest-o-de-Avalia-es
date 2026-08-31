@@ -1,0 +1,5 @@
+import crypto from 'node:crypto'; import QRCode from 'qrcode';
+export interface QrPayload {v:1;t:string;sid:string;iat:number;sig:string}
+export function createQrPayload(sheetId:string,secret:string):QrPayload {const unsigned=`1|${sheetId}|${Math.floor(Date.now()/1000)}`;const [v,sid,iat]=unsigned.split('|');const sig=crypto.createHmac('sha256',secret).update(unsigned).digest('base64url').slice(0,22);return {v:Number(v) as 1,t:'sheet',sid,iat:Number(iat),sig};}
+export function verifyQrPayload(payload:QrPayload,secret:string){if(!payload||payload.v!==1||payload.t!=='sheet'||typeof payload.sid!=='string'||typeof payload.sig!=='string')return false;const expected=crypto.createHmac('sha256',secret).update(`${payload.v}|${payload.sid}|${payload.iat}`).digest('base64url').slice(0,22);const actual=Buffer.from(payload.sig);const wanted=Buffer.from(expected);return actual.length===wanted.length&&crypto.timingSafeEqual(wanted,actual);}
+export const qrDataUrl=(payload:QrPayload)=>QRCode.toDataURL(JSON.stringify(payload),{errorCorrectionLevel:'H',margin:1,width:512});
