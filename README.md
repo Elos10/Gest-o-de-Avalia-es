@@ -25,7 +25,7 @@ Mais detalhes: [arquitetura](docs/ARQUITETURA.md).
 
 ## Publicação na Vercel com Supabase
 
-O repositório já contém `vercel.json` e entradas serverless em `api/`. Importe a raiz do repositório na Vercel e mantenha o preset definido pelo arquivo.
+O repositório já contém `vercel.json` e entradas serverless em `api/`. Importe a raiz do repositório na Vercel e mantenha o preset definido pelo arquivo. A compilação copia o frontend para `dist` na raiz, que deve ser também o **Output Directory** configurado no painel.
 
 Cadastre estas variáveis em **Production**, **Preview** e **Development** quando aplicável:
 
