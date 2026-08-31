@@ -24,6 +24,7 @@ enum Subject {
 enum TimeMode {
   PARTIAL
   FULL
+  ALL
 }
 
 enum AssessmentStatus {
@@ -127,7 +128,7 @@ model Student {
 model Assessment {
   id             String           @id @default(uuid()) @db.Uuid
   unitId         String           @map("unit_id") @db.Uuid
-  classId        String           @map("class_id") @db.Uuid
+  classId        String?          @map("class_id") @db.Uuid
   createdBy      String           @map("created_by") @db.Uuid
   number         String
   year           Int
@@ -139,7 +140,7 @@ model Assessment {
   assessmentDate DateTime         @map("assessment_date") @db.Date
   status         AssessmentStatus @default(DRAFT)
   unit           EducationalUnit  @relation(fields: [unitId], references: [id])
-  schoolClass    SchoolClass      @relation(fields: [classId], references: [id])
+  schoolClass    SchoolClass?     @relation(fields: [classId], references: [id])
   creator        Profile          @relation("AssessmentCreator", fields: [createdBy], references: [id])
   key            OfficialAnswer[]
   sheets         AnswerSheet[]
