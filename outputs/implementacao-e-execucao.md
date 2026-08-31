@@ -45,13 +45,8 @@
 - Três imagens sintéticas: marca/branco/dupla, rotação de 2,5 graus e perspectiva.
 - Prova integrada com o PDF final: QR lido, quatro marcadores normalizados, alinhamento 91,24%, 20 questões e zero falso preenchimento.
 
-## Execução
+## Publicação
 
-1. Copie `.env.example` para `.env` e configure Supabase/PostgreSQL.
-2. Execute `pnpm install`, `pnpm db:generate` e `pnpm db:migrate`.
-3. Aplique `supabase/migrations/0001_initial.sql`.
-4. Crie o usuário Auth inicial e adapte `supabase/bootstrap_admin.sql`.
-5. Instale `workers/omr/requirements.txt` e informe `OMR_PYTHON_PATH`.
-6. Execute `pnpm dev` e abra `http://localhost:5173`.
+O sistema é compilado pela Vercel a partir da branch `main` do GitHub. O frontend e a API usam o mesmo domínio, enquanto autenticação, banco e armazenamento são fornecidos pelo Supabase. As variáveis obrigatórias devem ser cadastradas no ambiente **Production** da Vercel; nenhuma credencial secreta é mantida no repositório.
 
 Para imprimir, use o PDF baixado e selecione **Tamanho real / 100%**, sem ajuste automático. Para validar o scanner, digitalize a 300 dpi e envie em **Leitura de gabaritos**.

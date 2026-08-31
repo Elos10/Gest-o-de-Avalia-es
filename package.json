@@ -7,9 +7,6 @@
   "scripts": {
     "postinstall": "prisma generate --schema prisma/schema.prisma",
     "prebuild": "prisma generate --schema prisma/schema.prisma",
-    "web": "pnpm --filter @omr/web dev",
-    "web:preview": "pnpm --filter @omr/web build && pnpm --filter @omr/web preview",
-    "dev": "concurrently -n api,web -c blue,green \"pnpm --filter @omr/api dev\" \"pnpm --filter @omr/web dev\"",
     "build": "pnpm -r build && node scripts/prepare-vercel-output.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,7 +20,6 @@
     "@types/node": "22.15.30",
     "@prisma/client": "6.8.2",
     "pdf-lib": "1.17.1",
-    "concurrently": "9.1.2",
     "prisma": "6.8.2",
     "tsx": "4.19.4",
     "typescript": "5.8.3",
