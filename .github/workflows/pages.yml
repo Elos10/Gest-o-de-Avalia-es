@@ -30,6 +30,8 @@ jobs:
           version: 10.15.0
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
+      - name: Compilar regras compartilhadas
+        run: pnpm --filter @omr/core build
       - name: Compilar frontend
         env:
           VITE_BASE_PATH: /Gest-o-de-Avalia-es/
