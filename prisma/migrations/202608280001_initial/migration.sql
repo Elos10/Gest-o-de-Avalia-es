@@ -1,9 +1,3 @@
-Scope: all 4 workspace projects
-✓ Lockfile passes supply-chain policies (verified 12s ago)
-Lockfile is up to date, resolution step is skipped
-Already up to date
-
-Done in 619ms using pnpm v11.19.0
 -- CreateEnum
 CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'MANAGER', 'TEACHER', 'OPERATOR');
 
