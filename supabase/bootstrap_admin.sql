@@ -1,46 +1,34 @@
--- Execute este arquivo inteiro no Supabase SQL Editor depois das migrations.
--- O comando pode ser repetido e nunca armazena a senha do usuário.
+-- Execute os três comandos juntos depois das migrations.
+-- Pode ser repetido e nunca armazena a senha do usuário.
 
-with
-admin_user as materialized (
-  select id
-  from auth.users
-  where lower(email) = lower('detic@uberabadigital.com.br')
-  limit 1
-),
-existing_org as materialized (
-  select id
+insert into public.organizations (id, name)
+select gen_random_uuid(), 'Secretaria Municipal de Educação de Uberaba'
+where not exists (
+  select 1
   from public.organizations
   where name = 'Secretaria Municipal de Educação de Uberaba'
-  order by created_at
-  limit 1
-),
-inserted_org as materialized (
-  insert into public.organizations (id, name)
-  select gen_random_uuid(), 'Secretaria Municipal de Educação de Uberaba'
-  where not exists (select 1 from existing_org)
-  returning id
-),
-admin_org as materialized (
-  select id from existing_org
-  union all
-  select id from inserted_org
-  limit 1
-)
+);
+
 insert into public.profiles (id, organization_id, name, role, active)
 select
-  admin_user.id,
-  admin_org.id,
+  u.id,
+  (
+    select o.id
+    from public.organizations o
+    where o.name = 'Secretaria Municipal de Educação de Uberaba'
+    order by o.created_at
+    limit 1
+  ),
   'Administrador DETIC',
   'ADMIN',
   true
-from admin_user
-cross join admin_org
+from auth.users u
+where lower(u.email) = lower('detic@uberabadigital.com.br')
 on conflict (id) do update set
   organization_id = excluded.organization_id,
   name = excluded.name,
-  role = 'ADMIN',
-  active = true;
+  role = excluded.role,
+  active = excluded.active;
 
 select
   u.email,
