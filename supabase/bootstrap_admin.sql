@@ -1,37 +1,53 @@
--- Execute no Supabase SQL Editor depois de criar e confirmar o usuário no Auth.
--- Este script é idempotente e nunca armazena a senha do usuário.
-do $$
-declare
-  v_admin_email text := 'detic@uberabadigital.com.br';
-  v_user_id uuid;
-  v_org_id uuid;
-begin
-  select id into v_user_id
+-- Execute este arquivo inteiro no Supabase SQL Editor depois das migrations.
+-- O comando pode ser repetido e nunca armazena a senha do usuário.
+
+with
+admin_user as materialized (
+  select id
   from auth.users
-  where lower(email)=lower(v_admin_email)
-  limit 1;
-
-  if v_user_id is null then
-    raise exception 'Usuário % não encontrado no Supabase Auth.', v_admin_email;
-  end if;
-
-  select id into v_org_id
+  where lower(email) = lower('detic@uberabadigital.com.br')
+  limit 1
+),
+existing_org as materialized (
+  select id
   from public.organizations
-  where name='Secretaria Municipal de Educação de Uberaba'
+  where name = 'Secretaria Municipal de Educação de Uberaba'
   order by created_at
-  limit 1;
+  limit 1
+),
+inserted_org as materialized (
+  insert into public.organizations (id, name)
+  select gen_random_uuid(), 'Secretaria Municipal de Educação de Uberaba'
+  where not exists (select 1 from existing_org)
+  returning id
+),
+admin_org as materialized (
+  select id from existing_org
+  union all
+  select id from inserted_org
+  limit 1
+)
+insert into public.profiles (id, organization_id, name, role, active)
+select
+  admin_user.id,
+  admin_org.id,
+  'Administrador DETIC',
+  'ADMIN',
+  true
+from admin_user
+cross join admin_org
+on conflict (id) do update set
+  organization_id = excluded.organization_id,
+  name = excluded.name,
+  role = 'ADMIN',
+  active = true;
 
-  if v_org_id is null then
-    insert into public.organizations(id,name)
-    values (gen_random_uuid(),'Secretaria Municipal de Educação de Uberaba')
-    returning id into v_org_id;
-  end if;
-
-  insert into public.profiles(id,organization_id,name,role,active)
-  values (v_user_id,v_org_id,'Administrador DETIC','ADMIN',true)
-  on conflict (id) do update set
-    organization_id=excluded.organization_id,
-    name=excluded.name,
-    role='ADMIN',
-    active=true;
-end $$;
+select
+  u.email,
+  p.role,
+  p.active,
+  o.name as organization
+from auth.users u
+left join public.profiles p on p.id = u.id
+left join public.organizations o on o.id = p.organization_id
+where lower(u.email) = lower('detic@uberabadigital.com.br');
