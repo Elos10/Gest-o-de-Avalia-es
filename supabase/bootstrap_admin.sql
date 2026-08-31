@@ -22,8 +22,8 @@ begin
   limit 1;
 
   if v_org_id is null then
-    insert into public.organizations(name)
-    values ('Secretaria Municipal de Educação de Uberaba')
+    insert into public.organizations(id,name)
+    values (gen_random_uuid(),'Secretaria Municipal de Educação de Uberaba')
     returning id into v_org_id;
   end if;
 
