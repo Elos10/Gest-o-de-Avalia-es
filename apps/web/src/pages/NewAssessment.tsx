@@ -15,6 +15,7 @@ export function NewAssessment(){
  const [grade,setGrade]=useState(7);
  const [subject,setSubject]=useState<Subject>('MATHEMATICS');
  const [message,setMessage]=useState('');
+ const [saving,setSaving]=useState(false);
  const networkWide=unitId===NETWORK;
 
  useEffect(()=>{Promise.all([api<SchoolClass[]>('/api/classes'),api<Unit[]>('/api/units')]).then(([c,u])=>{setClasses(c);setUnits(u)}).catch(e=>setMessage(e.message))},[]);
@@ -27,9 +28,11 @@ export function NewAssessment(){
   e.preventDefault();
   const raw=Object.fromEntries(new FormData(e.currentTarget));
   try{
+   setSaving(true);
+   setMessage('');
    const created=await api<Assessment>('/api/assessments',{method:'POST',body:JSON.stringify({...raw,scope:networkWide?'NETWORK':'CLASS',unitId:networkWide?undefined:unitId,classId:networkWide?null:raw.classId,grade,year:Number(raw.year),subject:safeSubject})});
-   nav(`/avaliacoes/${created.id}`);
-  }catch(error){setMessage((error as Error).message)}
+   nav(`/avaliacoes/${created.id}`,{replace:true,state:{created:true}});
+  }catch(error){setMessage((error as Error).message);setSaving(false)}
  }
 
  return <Page eyebrow="Avaliações" title="Nova avaliação" description="Crie uma avaliação para uma turma específica ou para toda a rede municipal.">
@@ -43,7 +46,7 @@ export function NewAssessment(){
    <label><span className="label">Data</span><input className="field" type="date" name="assessmentDate" required/></label>
    <label><span className="label">Tempo</span><select className="field" name="timeMode"><option value="ALL">Todos — parcial e integral</option><option value="PARTIAL">Parcial</option><option value="FULL">Integral</option></select></label>
    <div className="rounded-xl bg-mint p-4 md:col-span-2"><div className="text-sm text-forest">Quantidade definida pela regra central</div><div className="text-3xl font-bold">{count} questões</div><div className="mt-1 text-sm text-black/50">Abrangência: {networkWide?'toda a rede municipal':'turma selecionada'}</div></div>
-   <button className="btn md:col-span-2">Salvar e configurar gabarito</button>
+   <button className="btn md:col-span-2 disabled:cursor-wait disabled:opacity-60" disabled={saving}>{saving?'Salvando avaliação…':'Salvar e configurar gabarito'}</button>
    {message&&<p className="md:col-span-2 text-sm text-red-700">{message}</p>}
   </form>
  </Page>;
