@@ -8,11 +8,13 @@ import {authenticate,permit} from '../plugins/auth.js';
 import {createAssessment,saveAnswerKey} from '../services/assessmentService.js';
 import {createSheet,sheetPdf} from '../services/answerSheetService.js';
 import {processUpload} from '../services/processingService.js';
+import {importStudents} from '../services/studentService.js';
 
 const uuid=z.string().uuid();
 const unitInput=z.object({name:z.string().trim().min(2).max(160),code:z.string().trim().max(30).optional()});
 const classInput=z.object({unitId:uuid,name:z.string().trim().min(1).max(60),grade:z.number().int().min(1).max(9),schoolYear:z.number().int().min(2020).max(2100),timeMode:z.enum(['PARTIAL','FULL'])});
 const studentInput=z.object({classId:uuid,name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional()});
+const studentImportInput=z.object({rows:z.array(z.object({name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional(),unit:z.string().trim().min(1).max(160),grade:z.number().int().min(1).max(9),className:z.string().trim().min(1).max(60),timeMode:z.enum(['PARTIAL','FULL'])})).min(1).max(2000)});
 const assessmentInput=z.object({scope:z.enum(['CLASS','NETWORK']).default('CLASS'),unitId:uuid.optional(),classId:uuid.nullish(),number:z.string().trim().min(1).max(30),year:z.number().int().min(2020).max(2100),grade:z.number().int().min(1).max(9),subject:z.enum(['PORTUGUESE','MATHEMATICS','SINGLE']),timeMode:z.enum(['PARTIAL','FULL','ALL']),assessmentDate:z.string().date()});
 type UnitInput={name:string;code?:string};
 type ClassInput={unitId:string;name:string;grade:number;schoolYear:number;timeMode:'PARTIAL'|'FULL'};
@@ -36,6 +38,7 @@ export async function routes(app:FastifyInstance){
  app.post('/api/classes',{preHandler:permit('ADMIN','MANAGER')},async r=>{const input=parseInput<ClassInput>(classInput,r.body);await requireUnit(input.unitId,r.auth.organizationId);return db.schoolClass.create({data:{unitId:input.unitId,name:input.name,grade:input.grade,schoolYear:input.schoolYear,timeMode:input.timeMode}});});
  app.get('/api/students',{preHandler:authenticate},r=>db.student.findMany({where:{schoolClass:{unit:{organizationId:r.auth.organizationId}}},include:{schoolClass:{include:{unit:true}}},orderBy:{name:'asc'}}));
  app.post('/api/students',{preHandler:permit('ADMIN','MANAGER','TEACHER')},async r=>{const input=parseInput<StudentInput>(studentInput,r.body);await requireClass(input.classId,r.auth.organizationId);return db.student.create({data:{classId:input.classId,name:input.name,registration:input.registration}});});
+ app.post('/api/students/import',{preHandler:permit('ADMIN','MANAGER','TEACHER','OPERATOR')},async r=>{const input=studentImportInput.parse(r.body);return importStudents(input.rows,r.auth.organizationId);});
 
  app.get('/api/assessments',{preHandler:authenticate},r=>db.assessment.findMany({where:assessmentOrg(r.auth.organizationId),include:{unit:true,schoolClass:true,_count:{select:{key:true,sheets:true}}},orderBy:{assessmentDate:'desc'}}));
  app.get('/api/assessments/:id',{preHandler:authenticate},r=>db.assessment.findFirstOrThrow({where:{id:uuid.parse((r.params as {id:string}).id),...assessmentOrg(r.auth.organizationId)},include:{unit:true,schoolClass:{include:{students:true}},key:{orderBy:{question:'asc'}},sheets:{include:{student:true},orderBy:{createdAt:'desc'}}}}));
