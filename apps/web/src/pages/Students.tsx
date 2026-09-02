@@ -16,7 +16,7 @@ export function Students(){
  const availableClasses=useMemo(()=>classes.filter(x=>x.unitId===unitId&&x.grade===grade),[classes,unitId,grade]);
  const selectedClass=classes.find(x=>x.id===classId);
 
- async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();try{await api('/api/students',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget)))});e.currentTarget.reset();setClassId('');setMessage('Aluno cadastrado com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
+ async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget;try{await api('/api/students',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();setClassId('');setMessage('Aluno cadastrado com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
  async function chooseFile(file?:File){if(!file)return;try{const rows=parseStudentCsv(await file.text());setImportRows(rows);setMessage(`${rows.length} aluno(s) pronto(s) para importação.`)}catch(e){setImportRows([]);setMessage((e as Error).message)}}
  async function importFile(){if(!importRows.length)return;try{setImporting(true);const result=await api<{imported:number}>('/api/students/import',{method:'POST',body:JSON.stringify({rows:importRows})});setImportRows([]);setMessage(`${result.imported} aluno(s) importado(s) com sucesso.`);await load()}catch(e){setMessage((e as Error).message)}finally{setImporting(false)}}
  const filtered=items.filter(x=>`${x.name} ${x.registration??''} ${x.schoolClass.unit.name} ${x.schoolClass.name}`.toLowerCase().includes(query.toLowerCase()));

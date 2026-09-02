@@ -7,7 +7,7 @@ export function Classes(){
  const [items,setItems]=useState<SchoolClass[]>([]),[units,setUnits]=useState<Unit[]>([]),[message,setMessage]=useState('');
  const load=()=>Promise.all([api<SchoolClass[]>('/api/classes'),api<Unit[]>('/api/units')]).then(([a,b])=>{setItems(a);setUnits(b)}).catch(e=>setMessage(e.message));
  useEffect(()=>{void load()},[]);
- async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const raw=Object.fromEntries(new FormData(e.currentTarget));try{await api('/api/classes',{method:'POST',body:JSON.stringify({...raw,grade:Number(raw.grade),schoolYear:Number(raw.schoolYear)})});e.currentTarget.reset();setMessage('Turma cadastrada com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
+ async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget,raw=Object.fromEntries(new FormData(form));try{await api('/api/classes',{method:'POST',body:JSON.stringify({...raw,grade:Number(raw.grade),schoolYear:Number(raw.schoolYear)})});form.reset();setMessage('Turma cadastrada com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
  return <Page eyebrow="Cadastros" title="Turmas" description="Organize unidade, série, turma, ano letivo e tempo.">
   <form className="card grid w-full gap-4 md:grid-cols-2 xl:grid-cols-[2fr_1fr_1fr_1fr_1fr_auto] xl:items-end" onSubmit={submit}>
    <label><span className="label">Unidade</span><select className="field" name="unitId" required><option value="">Selecione</option>{units.filter(x=>x.code!=='REDE').map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
