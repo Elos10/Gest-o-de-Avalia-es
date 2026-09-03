@@ -56,16 +56,21 @@ def fills(image:np.ndarray,count=20):
         answers.append({'question':q+1,'fills':values})
     return answers
 
-def main():
-    p=argparse.ArgumentParser();p.add_argument('--input',required=True);p.add_argument('--template',required=True);args=p.parse_args(); detector=PageLayoutDetector(); best=None
-    for page in detector.load(Path(args.input)):
+def process_path(input_path: Path):
+    detector=PageLayoutDetector(); best=None
+    for page in detector.load(input_path):
         for candidate in detector.candidates(page):
             try:
                 normalized,quality=detector.normalize(candidate);code=decode_qr(normalized)
                 if best is None or quality>best[1]:best=(normalized,quality,code)
             except RuntimeError as e:print(str(e),file=sys.stderr)
     if best is None:raise RuntimeError('NO_ANSWER_SHEET_FOUND')
-    image,quality,payload=best;print(json.dumps({'qrPayload':payload,'quality':{'alignment':round(quality,4)},'answers':fills(image)}))
+    image,quality,payload=best
+    return {'qrPayload':payload,'quality':{'alignment':round(quality,4)},'answers':fills(image)}
+
+def main():
+    p=argparse.ArgumentParser();p.add_argument('--input',required=True);p.add_argument('--template',required=True);args=p.parse_args()
+    print(json.dumps(process_path(Path(args.input))))
 if __name__=='__main__':
     try:main()
     except Exception as e:print(str(e),file=sys.stderr);sys.exit(2)

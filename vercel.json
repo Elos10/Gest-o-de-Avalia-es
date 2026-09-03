@@ -8,9 +8,14 @@
     "api/**/*.ts": {
       "maxDuration": 60,
       "memory": 1024
+    },
+    "api/omr-worker.py": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "routes": [
+    {"src": "/api/omr-worker", "dest": "/api/omr-worker.py"},
     {"src": "/api/(.*)", "dest": "/api/[...path]"},
     {"handle": "filesystem"},
     {"src": "/(.*)", "dest": "/index.html"}
