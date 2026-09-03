@@ -41,13 +41,20 @@ async function drawHalf(doc: PDFDocument, page: PDFPage, font: PDFFont, data: Sh
 
   const tableLeft = offset + 18;
   const tableRight = offset + 97;
+  const rows = h.questions.slice(0, data.questionCount);
+  const tableBottom = rows.at(-1)!.y + 2.3;
+  const gridColor = rgb(0.72, 0.72, 0.72);
   page.drawRectangle({ x: mmToPt(tableLeft), y: y(75.2), width: mmToPt(tableRight - tableLeft), height: mmToPt(7.2), color: rgb(0.94, 0.95, 0.95), borderColor: rgb(0.35, 0.35, 0.35), borderWidth: 0.45 });
-  page.drawLine({ start: { x: mmToPt(offset + 31), y: y(68) }, end: { x: mmToPt(offset + 31), y: y(75.2) }, thickness: 0.45, color: rgb(0.35, 0.35, 0.35) });
+  page.drawRectangle({ x: mmToPt(tableLeft), y: y(tableBottom), width: mmToPt(tableRight - tableLeft), height: mmToPt(tableBottom - 75.2), borderColor: rgb(0.35, 0.35, 0.35), borderWidth: 0.45 });
+  page.drawLine({ start: { x: mmToPt(offset + 31), y: y(68) }, end: { x: mmToPt(offset + 31), y: y(tableBottom) }, thickness: 0.45, color: rgb(0.35, 0.35, 0.35) });
+  page.drawLine({ start: { x: mmToPt(offset + 31), y: y(72) }, end: { x: mmToPt(tableRight), y: y(72) }, thickness: 0.3, color: gridColor });
+  for (const columnX of [41, 55, 69, 83]) page.drawLine({ start: { x: mmToPt(offset + columnX), y: y(72) }, end: { x: mmToPt(offset + columnX), y: y(tableBottom) }, thickness: 0.25, color: gridColor });
+  for (const row of rows) page.drawLine({ start: { x: mmToPt(tableLeft), y: y(row.y + 2.3) }, end: { x: mmToPt(tableRight), y: y(row.y + 2.3) }, thickness: 0.25, color: gridColor });
   centeredText(page, font, 'QUESTÃO', offset + 24.5, 69.2, 5.7);
   centeredText(page, font, 'RESPOSTAS', offset + 62, 68.4, 5.5);
   for (const bubble of h.questions[0].bubbles) centeredText(page, font, bubble.choice, offset + bubble.x, 72.2, 6.2);
 
-  for (const row of h.questions.slice(0, data.questionCount)) {
+  for (const row of rows) {
     centeredText(page, font, String(row.question).padStart(2, '0'), offset + 24.5, row.y - 0.1, 7);
     for (const bubble of row.bubbles) page.drawCircle({ x: mmToPt(offset + bubble.x), y: y(bubble.y), size: mmToPt(bubble.r), borderWidth: 0.7, borderColor: rgb(0, 0, 0) });
   }
