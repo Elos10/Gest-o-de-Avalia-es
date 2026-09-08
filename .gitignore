@@ -4,6 +4,10 @@ dist
 .env.local
 coverage
 uploads
+output/
+tmp/
+__pycache__/
+*.pyc
 *.log
 apps/web/.vite
 tests/fixtures/generated/*

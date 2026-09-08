@@ -6,12 +6,14 @@ import type {Processing} from '../lib/types';
 import {Page} from '../components/Page';
 
 const stages=['Validar assinatura real do arquivo','Identificar QR e folha do aluno','Corrigir rotação e perspectiva','Medir preenchimento das bolhas','Separar leituras confiáveis e revisão'];
+const statusLabels:Record<string,string>={RECEIVED:'Recebido',PROCESSING:'Processando',REVIEW_REQUIRED:'Revisão necessária',READY:'Pronto para corrigir',FINALIZED:'Finalizado',FAILED:'Falhou'};
 
 export function Reading(){
  const nav=useNavigate();
  const timer=useRef<ReturnType<typeof setInterval>|undefined>(undefined);
  const [file,setFile]=useState<File|null>(null),[items,setItems]=useState<Processing[]>([]),[message,setMessage]=useState(''),[processing,setProcessing]=useState(false),[progress,setProgress]=useState(0);
- useEffect(()=>{api<Processing[]>('/api/processings').then(setItems).catch(()=>{});return()=>{if(timer.current)clearInterval(timer.current)}},[]);
+ const load=()=>api<Processing[]>('/api/processings').then(setItems).catch(()=>{});
+ useEffect(()=>{void load();return()=>{if(timer.current)clearInterval(timer.current)}},[]);
  const activeStage=Math.min(stages.length-1,Math.floor(progress/20));
  async function process(){
   if(!file||processing)return;
@@ -23,7 +25,7 @@ export function Reading(){
    if(timer.current)clearInterval(timer.current);setProgress(100);setMessage('Leitura concluída. Abrindo a conferência…');
    setTimeout(()=>nav(`/leitura/${body.id}/revisao`),450);
   }catch(error){
-   if(timer.current)clearInterval(timer.current);setProgress(0);setMessage((error as Error).message);setProcessing(false);
+   if(timer.current)clearInterval(timer.current);setProgress(0);setMessage((error as Error).message);setProcessing(false);await load();
   }
  }
  return <Page eyebrow="Processamento" title="Leitura de gabaritos" description="Envie PDF, JPG ou PNG digitalizado. Página A4 inteira ou metade cortada.">
@@ -40,6 +42,6 @@ export function Reading(){
     {message&&<p className={`mt-4 rounded-xl px-3 py-2 text-sm ${progress===100?'bg-mint text-forest':'bg-red-50 text-red-700'}`}>{message}</p>}
    </div>
   </div>
-  <h2 className="mt-9 text-xl font-bold">Processamentos recentes</h2><div className="card mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="pb-3">Aluno</th><th>Avaliação</th><th>Status</th><th>Data</th></tr></thead><tbody>{items.map(item=><tr className="border-b last:border-0" key={item.id}><td className="py-3 font-semibold"><Link to={`/leitura/${item.id}/revisao`}>{item.sheet?.student?.name??'Não identificado'}</Link></td><td>{item.sheet?.assessment.number??'—'}</td><td>{item.status}</td><td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td></tr>)}</tbody></table></div>
+  <h2 className="mt-9 text-xl font-bold">Processamentos recentes</h2><div className="card mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="pb-3">Aluno</th><th>Avaliação</th><th>Status</th><th>Data</th></tr></thead><tbody>{items.map(item=><tr className="border-b last:border-0" key={item.id}><td className="py-3 font-semibold">{item.sheet&&item.status!=='FAILED'?<Link className="text-forest hover:underline" to={`/leitura/${item.id}/revisao`}>{item.sheet.student?.name??'Folha sem aluno'}</Link>:<span>Não identificado</span>}</td><td>{item.sheet?.assessment.number??'—'}</td><td><span className={`rounded-full px-2 py-1 text-xs font-semibold ${item.status==='FAILED'?'bg-red-50 text-red-700':item.status==='FINALIZED'?'bg-mint text-forest':'bg-amber/15 text-ink'}`}>{statusLabels[item.status]??item.status}</span>{item.status==='FAILED'&&<small className="mt-1 block max-w-xs text-red-700">{item.errorCode??'Falha de leitura'}</small>}</td><td>{new Date(item.createdAt).toLocaleString('pt-BR')}</td></tr>)}</tbody></table>{!items.length&&<p className="py-8 text-center text-black/45">Nenhum arquivo processado.</p>}</div>
  </Page>
 }
