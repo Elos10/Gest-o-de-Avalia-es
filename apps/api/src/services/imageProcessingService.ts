@@ -30,15 +30,24 @@ async function processOnVercel(filePath: string): Promise<WorkerResult> {
   const host = process.env.VERCEL_URL;
   if (!host) throw new Error('OMR_SERVICE_UNAVAILABLE');
   const extension = path.extname(filePath).toLowerCase().replace(/[^.a-z0-9]/g, '') || '.bin';
-  const response = await fetch(`https://${host}/api/omr-worker?ext=${encodeURIComponent(extension)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream', 'X-OMR-Secret': requiredSecret('QR_HMAC_SECRET') },
-    body: await fs.readFile(filePath),
-    signal: AbortSignal.timeout(55_000),
-  });
-  const payload = await response.json().catch(() => null) as WorkerResult | { message?: string } | null;
-  if (!response.ok) throw new Error(`OMR_WORKER_FAILED: ${payload && 'message' in payload ? payload.message : `HTTP ${response.status}`}`);
-  return payload as WorkerResult;
+  const body = await fs.readFile(filePath);
+  let lastDetail = 'resposta vazia';
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const response = await fetch(`https://${host}/api/omr-worker?ext=${encodeURIComponent(extension)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/octet-stream', 'X-OMR-Secret': requiredSecret('QR_HMAC_SECRET') },
+      body,
+      signal: AbortSignal.timeout(27_000),
+    });
+    const raw = await response.text();
+    let payload: WorkerResult | { message?: string } | null = null;
+    try { payload = JSON.parse(raw) as WorkerResult | { message?: string }; }
+    catch { lastDetail = `HTTP ${response.status}, ${response.headers.get('content-type') ?? 'sem tipo'}, ${raw.length} bytes`; }
+    if (!response.ok) throw new Error(`OMR_WORKER_FAILED: ${payload && 'message' in payload ? payload.message : lastDetail}`);
+    if (payload && 'qrPayload' in payload && Array.isArray(payload.answers) && payload.quality) return payload;
+    if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 350));
+  }
+  throw new Error(`OMR_WORKER_INVALID_OUTPUT: ${lastDetail}`);
 }
 
 export function processImage(filePath: string): Promise<WorkerResult> {

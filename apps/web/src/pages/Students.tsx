@@ -13,8 +13,7 @@ export function Students(){
  const [query,setQuery]=useState(''),[message,setMessage]=useState(''),[importRows,setImportRows]=useState<StudentImportRow[]>([]),[importing,setImporting]=useState(false);
  const load=()=>Promise.all([api<Student[]>('/api/students'),api<SchoolClass[]>('/api/classes'),api<Unit[]>('/api/units')]).then(([a,b,c])=>{setItems(a);setClasses(b);setUnits(c)}).catch(e=>setMessage(e.message));
  useEffect(()=>{void load()},[]);
- const availableClasses=useMemo(()=>classes.filter(x=>x.unitId===unitId&&x.grade===grade),[classes,unitId,grade]);
- const selectedClass=classes.find(x=>x.id===classId);
+ const availableClasses=useMemo(()=>classes.filter(x=>x.unitId===unitId&&x.grade===grade).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR',{numeric:true})||timeLabel(a.timeMode).localeCompare(timeLabel(b.timeMode),'pt-BR')),[classes,unitId,grade]);
 
  async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget;try{await api('/api/students',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();setClassId('');setMessage('Aluno cadastrado com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
  async function chooseFile(file?:File){if(!file)return;try{const rows=parseStudentCsv(await file.text());setImportRows(rows);setMessage(`${rows.length} aluno(s) pronto(s) para importação.`)}catch(e){setImportRows([]);setMessage((e as Error).message)}}
@@ -28,9 +27,9 @@ export function Students(){
      <label><span className="label">Nome completo</span><input className="field" name="name" required/></label>
      <label><span className="label">Matrícula</span><input className="field" name="registration"/></label>
      <label><span className="label">Unidade</span><select className="field" value={unitId} onChange={e=>{setUnitId(e.target.value);setClassId('')}} required><option value="">Selecione</option>{units.filter(x=>x.code!=='REDE').map(x=><option value={x.id} key={x.id}>{x.name}</option>)}</select></label>
-     <div className="grid grid-cols-2 gap-3"><label><span className="label">Série</span><select className="field" value={grade} onChange={e=>{setGrade(Number(e.target.value));setClassId('')}}>{Array.from({length:9},(_,i)=><option value={i+1} key={i}>{i+1}º ano</option>)}</select></label><label><span className="label">Tempo</span><input className="field bg-black/5" value={selectedClass?timeLabel(selectedClass.timeMode):'Selecione a turma'} readOnly/></label></div>
-     <label><span className="label">Turma</span><select className="field" name="classId" value={classId} onChange={e=>setClassId(e.target.value)} required disabled={!unitId}><option value="">Selecione</option>{availableClasses.map(x=><option value={x.id} key={x.id}>{x.name} — {timeLabel(x.timeMode)}</option>)}</select></label>
-     <button className="btn">Cadastrar aluno</button>
+     <label><span className="label">Série</span><select className="field" value={grade} onChange={e=>{setGrade(Number(e.target.value));setClassId('')}}>{Array.from({length:9},(_,i)=><option value={i+1} key={i}>{i+1}º ano</option>)}</select></label>
+     <label><span className="label">Turma/Tempo</span><select className="field" name="classId" value={classId} onChange={e=>setClassId(e.target.value)} required disabled={!unitId}><option value="">{unitId?'Selecione':'Selecione a unidade'}</option>{availableClasses.map(x=><option value={x.id} key={x.id}>{x.name} - {timeLabel(x.timeMode)}</option>)}</select></label>
+     <button className="btn" disabled={!classId}>Cadastrar aluno</button>
     </form>
     <section className="card"><div className="flex items-center gap-2"><Upload className="text-forest"/><h2 className="text-lg font-bold">Importar alunos</h2></div><p className="mt-2 text-sm text-black/50">Arquivo CSV com nome, matrícula, unidade, série, turma e tempo. Limite de 2.000 alunos por arquivo.</p>
      <button type="button" className="mt-4 flex items-center gap-2 text-sm font-semibold text-forest" onClick={downloadStudentTemplate}><Download size={17}/> Baixar modelo de exemplo</button>

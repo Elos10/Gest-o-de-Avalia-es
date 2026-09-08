@@ -22,7 +22,8 @@ export async function buildApp(){
  app.setErrorHandler((error,_request,reply)=>{
   app.log.error(error);
   const status=(error as {statusCode?:number}).statusCode??400;
-  reply.code(status).send({message:config.NODE_ENV==='production'?publicErrorMessage(error.message):error.message});
+  const publicMessage=publicErrorMessage(error.message);
+  reply.code(status).send({message:config.NODE_ENV==='production'||publicMessage!=='Não foi possível concluir a operação.'?publicMessage:error.message});
  });
  return app;
 }
