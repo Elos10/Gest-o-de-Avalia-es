@@ -129,14 +129,25 @@ def normalizar_gabarito(image: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def detectar_qrcode(image: np.ndarray) -> dict | None:
-    data, _, _ = cv2.QRCodeDetector().detectAndDecode(image)
-    if not data:
-        return None
-    try:
-        payload = json.loads(data)
-        return payload if isinstance(payload, dict) else None
-    except json.JSONDecodeError:
-        return None
+    detector = cv2.QRCodeDetector()
+    qr_roi = image[150:480, 150:480]
+    gray = cv2.cvtColor(qr_roi, cv2.COLOR_BGR2GRAY)
+    sharpened = cv2.addWeighted(gray, 1.8, cv2.GaussianBlur(gray, (0, 0), 2), -.8, 0)
+    otsu = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    adaptive = cv2.adaptiveThreshold(sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
+    variants = [image, qr_roi, gray, sharpened, otsu, adaptive]
+    variants.extend([cv2.resize(candidate, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC) for candidate in (gray, sharpened, otsu)])
+    for candidate in variants:
+        data, _, _ = detector.detectAndDecode(candidate)
+        if not data:
+            continue
+        try:
+            payload = json.loads(data)
+            if isinstance(payload, dict):
+                return payload
+        except json.JSONDecodeError:
+            continue
+    return None
 
 
 def calcular_preenchimento(binary: np.ndarray, center_x: int, center_y: int, radius: int) -> float:
