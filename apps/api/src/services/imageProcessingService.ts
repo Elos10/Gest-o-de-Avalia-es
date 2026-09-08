@@ -27,13 +27,13 @@ function processLocally(filePath: string): Promise<WorkerResult> {
 }
 
 async function processOnVercel(filePath: string): Promise<WorkerResult> {
-  const host = process.env.VERCEL_URL;
-  if (!host) throw new Error('OMR_SERVICE_UNAVAILABLE');
+  const workerUrl = new URL('/api/omr-worker', config.WEB_ORIGIN);
   const extension = path.extname(filePath).toLowerCase().replace(/[^.a-z0-9]/g, '') || '.bin';
+  workerUrl.searchParams.set('ext', extension);
   const body = await fs.readFile(filePath);
   let lastDetail = 'resposta vazia';
   for (let attempt = 1; attempt <= 2; attempt++) {
-    const response = await fetch(`https://${host}/api/omr-worker?ext=${encodeURIComponent(extension)}`, {
+    const response = await fetch(workerUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream', 'X-OMR-Secret': requiredSecret('QR_HMAC_SECRET') },
       body,
