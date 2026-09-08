@@ -7,7 +7,7 @@ import os
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from workers.omr.omr_worker import process_path
+from workers.omr.omr_worker import processar_arquivo
 
 
 class handler(BaseHTTPRequestHandler):
@@ -26,7 +26,7 @@ class handler(BaseHTTPRequestHandler):
                 temporary.write(self.rfile.read(length))
                 temporary_path = Path(temporary.name)
             try:
-                self.respond(200, process_path(temporary_path))
+                self.respond(200, processar_arquivo(temporary_path))
             finally:
                 temporary_path.unlink(missing_ok=True)
         except Exception as error:
