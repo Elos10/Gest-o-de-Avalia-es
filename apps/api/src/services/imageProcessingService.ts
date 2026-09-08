@@ -3,11 +3,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { config, requiredSecret } from '../config.js';
 
-export interface WorkerResult {
+export interface WorkerSheetResult {
+  pageNumber: number;
   qrPayload: { v: 1; t: string; sid: string; iat: number; sig: string } | null;
-  quality: Record<string, number>;
+  quality: Record<string, number | number[][]>;
   answers: Array<{ question: number; fills: Array<{ choice: 'A' | 'B' | 'C' | 'D' | 'E'; fill: number }> }>;
 }
+export interface WorkerResult {sheets:WorkerSheetResult[];errors:Array<{pageNumber:number;status:string;message:string}>;summary:{totalDetected:number;success:number;errors:number}}
 
 function processLocally(filePath: string): Promise<WorkerResult> {
   return new Promise((resolve, reject) => {
@@ -37,14 +39,14 @@ async function processOnVercel(filePath: string): Promise<WorkerResult> {
       method: 'POST',
       headers: { 'Content-Type': 'application/octet-stream', 'X-OMR-Secret': requiredSecret('QR_HMAC_SECRET') },
       body,
-      signal: AbortSignal.timeout(27_000),
+      signal: AbortSignal.timeout(240_000),
     });
     const raw = await response.text();
     let payload: WorkerResult | { message?: string } | null = null;
     try { payload = JSON.parse(raw) as WorkerResult | { message?: string }; }
     catch { lastDetail = `HTTP ${response.status}, ${response.headers.get('content-type') ?? 'sem tipo'}, ${raw.length} bytes`; }
     if (!response.ok) throw new Error(`OMR_WORKER_FAILED: ${payload && 'message' in payload ? payload.message : lastDetail}`);
-    if (payload && 'qrPayload' in payload && Array.isArray(payload.answers) && payload.quality) return payload;
+    if (payload && 'sheets' in payload && Array.isArray(payload.sheets) && Array.isArray(payload.errors)) return payload;
     if (attempt < 2) await new Promise(resolve => setTimeout(resolve, 350));
   }
   throw new Error(`OMR_WORKER_INVALID_OUTPUT: ${lastDetail}`);

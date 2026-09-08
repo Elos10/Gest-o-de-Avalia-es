@@ -1,9 +1,43 @@
-import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import crypto from 'node:crypto';import {createClient} from '@supabase/supabase-js';import {recognizeAnswer,verifyQrPayload} from '@omr/core';import {config,requiredSecret} from '../config.js';import {db} from '../db.js';import {inspectUpload} from './uploadSecurity.js';import {processImage} from './imageProcessingService.js';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {recognizeAnswer,verifyQrPayload} from '@omr/core';
 import type {Prisma} from '@prisma/client';
+import {config,requiredSecret} from '../config.js';
+import {db} from '../db.js';
+import {inspectUpload} from './uploadSecurity.js';
+import {processImage,type WorkerSheetResult} from './imageProcessingService.js';
+
+const recognitionConfig={blankThreshold:config.OMR_BLANK_THRESHOLD,markedThreshold:config.OMR_MARKED_THRESHOLD,doubleMarkDelta:config.OMR_DOUBLE_MARK_DELTA,trustedConfidence:config.OMR_TRUSTED_CONFIDENCE,reviewConfidence:config.OMR_REVIEW_CONFIDENCE};
+
+async function failedProcessing(userId:string,safe:{mime:string;sha256:string},code:string,detail:string,quality?:Prisma.InputJsonValue){
+ return db.readingProcessing.create({data:{uploadedBy:userId,status:'FAILED',storagePath:`ephemeral:${safe.sha256}`,mimeType:safe.mime,sha256:safe.sha256,algorithmVersion:'opencv-v2',quality,errorCode:code.slice(0,100),errorDetail:detail.slice(0,500),startedAt:new Date(),finishedAt:new Date()}});
+}
+
+async function persistSheet(result:WorkerSheetResult,userId:string,organizationId:string,safe:{mime:string;sha256:string}){
+ try{
+  if(!result.qrPayload||!verifyQrPayload(result.qrPayload,requiredSecret('QR_HMAC_SECRET')))throw new Error('QR_INVALID_OR_UNSIGNED');
+  const sheet=await db.answerSheet.findFirst({where:{publicCode:result.qrPayload.sid,assessment:{unit:{organizationId}}},include:{assessment:true}});
+  if(!sheet)throw new Error('ANSWER_SHEET_NOT_FOUND');
+  const answers=result.answers.slice(0,sheet.assessment.questionCount).map(answer=>recognizeAnswer(answer.question,answer.fills,recognitionConfig));
+  if(answers.length!==sheet.assessment.questionCount)throw new Error('ANSWER_GRID_INCOMPLETE');
+  const needsReview=answers.some(answer=>answer.status!=='MARKED'||answer.confidence<recognitionConfig.trustedConfidence);
+  return db.readingProcessing.create({data:{sheetId:sheet.id,uploadedBy:userId,status:needsReview?'REVIEW_REQUIRED':'READY',storagePath:`ephemeral:${safe.sha256}`,mimeType:safe.mime,sha256:safe.sha256,algorithmVersion:'opencv-v2',quality:result.quality as Prisma.InputJsonValue,startedAt:new Date(),finishedAt:new Date(),answers:{create:answers.map(answer=>({question:answer.question,detectedChoice:answer.selected,finalChoice:answer.selected,status:answer.status,confidence:answer.confidence,fills:answer.fills as unknown as Prisma.InputJsonValue}))}},include:{answers:true,sheet:{include:{assessment:true,student:true}}}});
+ }catch(error){return failedProcessing(userId,safe,(error as Error).message.split(':')[0],(error as Error).message,result.quality as Prisma.InputJsonValue);}
+}
+
 export async function processUpload(buffer:Buffer,declaredMime:string,userId:string,organizationId:string){
- const safe=await inspectUpload(buffer,declaredMime);const id=crypto.randomUUID(),objectPath=`${userId}/${id}.${safe.ext}`,tmp=path.join(os.tmpdir(),`omr-${id}.${safe.ext}`);const supabase=createClient(config.SUPABASE_URL,requiredSecret('SUPABASE_SECRET_KEY'),{auth:{persistSession:false}});
- const {error}=await supabase.storage.from('omr-private').upload(objectPath,buffer,{contentType:safe.mime,upsert:false});if(error)throw new Error(`STORAGE_UPLOAD_FAILED: ${error.message}`);
- const processing=await db.readingProcessing.create({data:{uploadedBy:userId,status:'PROCESSING',storagePath:objectPath,mimeType:safe.mime,sha256:safe.sha256,algorithmVersion:'opencv-v1',startedAt:new Date()}});
- try{await fs.writeFile(tmp,buffer);const result=await processImage(tmp);if(!result.qrPayload||!verifyQrPayload(result.qrPayload,requiredSecret('QR_HMAC_SECRET')))throw new Error('QR_INVALID_OR_UNSIGNED');const sheet=await db.answerSheet.findFirst({where:{publicCode:result.qrPayload.sid,assessment:{unit:{organizationId}}},include:{assessment:true}});if(!sheet)throw new Error('ANSWER_SHEET_NOT_FOUND');const answers=result.answers.slice(0,sheet.assessment.questionCount).map(a=>recognizeAnswer(a.question,a.fills));const needsReview=answers.some(a=>a.status!=='MARKED'||a.confidence<.9);return await db.readingProcessing.update({where:{id:processing.id},data:{sheetId:sheet.id,status:needsReview?'REVIEW_REQUIRED':'READY',quality:result.quality,finishedAt:new Date(),answers:{create:answers.map(a=>({question:a.question,detectedChoice:a.selected,finalChoice:a.selected,status:a.status,confidence:a.confidence,fills:a.fills as unknown as Prisma.InputJsonValue}))}},include:{answers:true,sheet:{include:{assessment:true,student:true}}}});
- }catch(e){await db.readingProcessing.update({where:{id:processing.id},data:{status:'FAILED',errorCode:(e as Error).message.split(':')[0],errorDetail:(e as Error).message.slice(0,500),finishedAt:new Date()}});throw e;}finally{await fs.rm(tmp,{force:true});}
+ const safe=await inspectUpload(buffer,declaredMime),temporaryPath=path.join(os.tmpdir(),`omr-${crypto.randomUUID()}.${safe.ext}`);
+ try{
+  await fs.writeFile(temporaryPath,buffer);
+  const worker=await processImage(temporaryPath),items=[];
+  for(const result of worker.sheets)items.push(await persistSheet(result,userId,organizationId,safe));
+  for(const error of worker.errors)items.push(await failedProcessing(userId,safe,error.status,error.message,{pageNumber:error.pageNumber}));
+  if(!items.length)items.push(await failedProcessing(userId,safe,'NO_ANSWER_SHEET_FOUND','Nenhum gabarito foi encontrado no arquivo.'));
+  const success=items.filter(item=>item.status==='READY').length,review=items.filter(item=>item.status==='REVIEW_REQUIRED').length,errors=items.filter(item=>item.status==='FAILED').length;
+  return{items,summary:{totalProcessed:items.length,totalSuccess:success,totalWithAlert:review,totalWithError:errors,totalRequiringReview:review}};
+ }finally{
+  await fs.rm(temporaryPath,{force:true});
+ }
 }
