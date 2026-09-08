@@ -63,15 +63,23 @@ async function drawHalf(doc: PDFDocument, page: PDFPage, font: PDFFont, data: Sh
 }
 
 export async function generateAnswerSheetPdf(data: SheetData, secret: string, fontPath?: string) {
+  return generateAnswerSheetBatchPdf([data, data], secret, fontPath);
+}
+
+export async function generateAnswerSheetBatchPdf(items: SheetData[], secret: string, fontPath?: string) {
+  if (!items.length) throw new Error('Nenhuma folha disponível para gerar o PDF.');
   const doc = await PDFDocument.create();
-  const page = doc.addPage([mmToPt(297), mmToPt(210)]);
   let font: PDFFont;
   if (fontPath) {
     try { doc.registerFontkit(fontkit); font = await doc.embedFont(await fs.readFile(fontPath), { subset: true }); }
     catch { font = await doc.embedFont(StandardFonts.Helvetica); }
   } else font = await doc.embedFont(StandardFonts.Helvetica);
-  await drawHalf(doc, page, font, data, 0, secret);
-  await drawHalf(doc, page, font, data, 148.5, secret);
-  page.drawLine({ start: { x: mmToPt(148.5), y: mmToPt(5) }, end: { x: mmToPt(148.5), y: mmToPt(205) }, thickness: 0.6, dashArray: [4, 3], color: rgb(0.4, 0.4, 0.4) });
+  for (let index = 0; index < items.length; index += 2) {
+    const page = doc.addPage([mmToPt(297), mmToPt(210)]);
+    await drawHalf(doc, page, font, items[index], 0, secret);
+    if (items[index + 1]) await drawHalf(doc, page, font, items[index + 1], 148.5, secret);
+    else centeredText(page, font, 'METADE SEM GABARITO', 222.75, 102, 10);
+    page.drawLine({ start: { x: mmToPt(148.5), y: mmToPt(5) }, end: { x: mmToPt(148.5), y: mmToPt(205) }, thickness: 0.6, dashArray: [4, 3], color: rgb(0.4, 0.4, 0.4) });
+  }
   return Buffer.from(await doc.save());
 }
