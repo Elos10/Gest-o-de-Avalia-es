@@ -129,24 +129,32 @@ def normalizar_gabarito(image: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def detectar_qrcode(image: np.ndarray) -> dict | None:
-    detector = cv2.QRCodeDetector()
     qr_roi = image[150:480, 150:480]
     gray = cv2.cvtColor(qr_roi, cv2.COLOR_BGR2GRAY)
-    sharpened = cv2.addWeighted(gray, 1.8, cv2.GaussianBlur(gray, (0, 0), 2), -.8, 0)
+    gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
+    sharpened = cv2.addWeighted(gray, 2.2, cv2.GaussianBlur(gray, (0, 0), 2), -1.2, 0)
     otsu = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
     adaptive = cv2.adaptiveThreshold(sharpened, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 31, 5)
-    variants = [image, qr_roi, gray, sharpened, otsu, adaptive]
-    variants.extend([cv2.resize(candidate, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC) for candidate in (gray, sharpened, otsu)])
-    for candidate in variants:
-        data, _, _ = detector.detectAndDecode(candidate)
-        if not data:
-            continue
-        try:
-            payload = json.loads(data)
-            if isinstance(payload, dict):
-                return payload
-        except json.JSONDecodeError:
-            continue
+    variants = [image, qr_roi, gray, sharpened, otsu, adaptive, cv2.bitwise_not(otsu)]
+    variants.extend([cv2.resize(candidate, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC if candidate is not otsu else cv2.INTER_NEAREST) for candidate in (gray, sharpened, otsu, adaptive)])
+    for epsilon in (.20, .35, .50):
+        detector = cv2.QRCodeDetector()
+        detector.setEpsX(epsilon); detector.setEpsY(epsilon)
+        for candidate in variants:
+            bordered = cv2.copyMakeBorder(candidate, 24, 24, 24, 24, cv2.BORDER_CONSTANT, value=255)
+            for decoder in (detector.detectAndDecode, detector.detectAndDecodeCurved):
+                try:
+                    data, _, _ = decoder(bordered)
+                except cv2.error:
+                    continue
+                if not data:
+                    continue
+                try:
+                    payload = json.loads(data)
+                    if isinstance(payload, dict):
+                        return payload
+                except json.JSONDecodeError:
+                    continue
     return None
 
 
