@@ -15,9 +15,8 @@
     }
   },
   "routes": [
-    {"src": "/api/omr-worker", "dest": "/api/omr-worker.py"},
-    {"src": "/api/(.*)", "dest": "/api/[...path]"},
     {"handle": "filesystem"},
+    {"src": "/api/(.*)", "dest": "/api/[...path]"},
     {"src": "/(.*)", "dest": "/index.html"}
   ]
 }
