@@ -7,7 +7,6 @@ import os
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from workers.omr.omr_worker import processar_arquivo
 
 
 class handler(BaseHTTPRequestHandler):
@@ -17,6 +16,7 @@ class handler(BaseHTTPRequestHandler):
             self.respond(403, {'message': 'Acesso não autorizado ao processador OMR.'})
             return
         try:
+            from workers.omr.omr_worker import processar_arquivo
             length = int(self.headers.get('Content-Length', '0'))
             if length <= 0 or length > 15 * 1024 * 1024:
                 raise ValueError('Arquivo vazio ou acima de 15 MB.')
