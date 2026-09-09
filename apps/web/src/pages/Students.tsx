@@ -4,6 +4,7 @@ import {api} from '../lib/api';
 import type {SchoolClass,Student,Unit} from '../lib/types';
 import {downloadStudentTemplate,parseStudentCsv,type StudentImportRow} from '../lib/studentImport';
 import {Page} from '../components/Page';
+import {MAX_STUDENT_IMPORT_ROWS,STUDENT_IMPORT_BATCH_SIZE} from '@omr/core';
 
 const timeLabel=(value:'PARTIAL'|'FULL')=>value==='FULL'?'Integral':'Parcial';
 
@@ -17,7 +18,7 @@ export function Students(){
 
  async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const form=e.currentTarget;try{await api('/api/students',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(form)))});form.reset();setClassId('');setMessage('Aluno cadastrado com sucesso.');await load()}catch(e){setMessage((e as Error).message)}}
  async function chooseFile(file?:File){if(!file)return;try{const rows=parseStudentCsv(await file.text());setImportRows(rows);setMessage(`${rows.length} aluno(s) pronto(s) para importação.`)}catch(e){setImportRows([]);setMessage((e as Error).message)}}
- async function importFile(){if(!importRows.length)return;try{setImporting(true);const result=await api<{imported:number}>('/api/students/import',{method:'POST',body:JSON.stringify({rows:importRows})});setImportRows([]);setMessage(`${result.imported} aluno(s) importado(s) com sucesso.`);await load()}catch(e){setMessage((e as Error).message)}finally{setImporting(false)}}
+ async function importFile(){if(!importRows.length)return;try{setImporting(true);let imported=0;for(let offset=0;offset<importRows.length;offset+=STUDENT_IMPORT_BATCH_SIZE){const batch=importRows.slice(offset,offset+STUDENT_IMPORT_BATCH_SIZE);setMessage(`Importando ${Math.min(offset+batch.length,importRows.length).toLocaleString('pt-BR')} de ${importRows.length.toLocaleString('pt-BR')} alunos…`);const result=await api<{imported:number}>('/api/students/import',{method:'POST',body:JSON.stringify({rows:batch})});imported+=result.imported}setImportRows([]);setMessage(`${imported.toLocaleString('pt-BR')} aluno(s) importado(s) com sucesso.`);await load()}catch(e){setMessage((e as Error).message)}finally{setImporting(false)}}
  const filtered=items.filter(x=>`${x.name} ${x.registration??''} ${x.schoolClass.unit.name} ${x.schoolClass.name}`.toLowerCase().includes(query.toLowerCase()));
 
  return <Page eyebrow="Cadastros" title="Alunos" description="Cadastre estudantes com unidade, série, turma e tempo ou importe uma lista padronizada.">
@@ -31,7 +32,7 @@ export function Students(){
      <label><span className="label">Turma/Tempo</span><select className="field" name="classId" value={classId} onChange={e=>setClassId(e.target.value)} required disabled={!unitId}><option value="">{unitId?'Selecione':'Selecione a unidade'}</option>{availableClasses.map(x=><option value={x.id} key={x.id}>{x.name} - {timeLabel(x.timeMode)}</option>)}</select></label>
      <button className="btn" disabled={!classId}>Cadastrar aluno</button>
     </form>
-    <section className="card"><div className="flex items-center gap-2"><Upload className="text-forest"/><h2 className="text-lg font-bold">Importar alunos</h2></div><p className="mt-2 text-sm text-black/50">Arquivo CSV com nome, matrícula, unidade, série, turma e tempo. Limite de 2.000 alunos por arquivo.</p>
+    <section className="card"><div className="flex items-center gap-2"><Upload className="text-forest"/><h2 className="text-lg font-bold">Importar alunos</h2></div><p className="mt-2 text-sm text-black/50">Arquivo CSV com nome, matrícula, unidade, série, turma e tempo. Limite de {MAX_STUDENT_IMPORT_ROWS.toLocaleString('pt-BR')} alunos por arquivo.</p>
      <button type="button" className="mt-4 flex items-center gap-2 text-sm font-semibold text-forest" onClick={downloadStudentTemplate}><Download size={17}/> Baixar modelo de exemplo</button>
      <label className="mt-4 block cursor-pointer rounded-xl border border-dashed border-black/20 p-4 text-center"><input className="hidden" type="file" accept=".csv,text/csv" onChange={e=>void chooseFile(e.target.files?.[0])}/><Upload className="mx-auto text-black/40"/><strong className="mt-2 block">Selecionar arquivo CSV</strong>{importRows.length>0&&<span className="text-sm text-forest">{importRows.length} linha(s) validada(s)</span>}</label>
      <button className="btn mt-3 w-full disabled:opacity-50" disabled={!importRows.length||importing} onClick={importFile}>{importing?'Importando…':'Importar alunos'}</button>

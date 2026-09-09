@@ -9,15 +9,19 @@ export async function importStudents(rows:StudentImportRow[],organizationId:stri
   db.educationalUnit.findMany({where:{organizationId}}),
   db.schoolClass.findMany({where:{unit:{organizationId}},orderBy:{schoolYear:'desc'}})
  ]);
+ const unitByNameOrCode=new Map<string,(typeof units)[number]>();
+ for(const unit of units){unitByNameOrCode.set(normalize(unit.name),unit);if(unit.code)unitByNameOrCode.set(normalize(unit.code),unit)}
+ const classByIdentity=new Map(classes.map(schoolClass=>[`${schoolClass.unitId}|${schoolClass.grade}|${normalize(schoolClass.name)}|${schoolClass.timeMode}`,schoolClass]));
  const errors:string[]=[];
  const data=rows.map((row,index)=>{
-  const unit=units.find(x=>normalize(x.name)===normalize(row.unit)||normalize(x.code??'')===normalize(row.unit));
+  const unit=unitByNameOrCode.get(normalize(row.unit));
   if(!unit){errors.push(`Linha ${index+2}: unidade “${row.unit}” não encontrada.`);return null}
-  const schoolClass=classes.find(x=>x.unitId===unit.id&&x.grade===row.grade&&normalize(x.name)===normalize(row.className)&&x.timeMode===row.timeMode);
+  const schoolClass=classByIdentity.get(`${unit.id}|${row.grade}|${normalize(row.className)}|${row.timeMode}`);
   if(!schoolClass){errors.push(`Linha ${index+2}: turma “${row.className}” não corresponde à unidade, série e tempo informados.`);return null}
   return {classId:schoolClass.id,name:row.name.trim(),registration:row.registration?.trim()||null};
  });
  if(errors.length)throw new Error(errors.slice(0,10).join(' '));
- await db.student.createMany({data:data.filter((x):x is NonNullable<typeof x>=>Boolean(x))});
+ const valid=data.filter((x):x is NonNullable<typeof x>=>Boolean(x));
+ await db.$transaction(Array.from({length:Math.ceil(valid.length/1_000)},(_,index)=>db.student.createMany({data:valid.slice(index*1_000,(index+1)*1_000)})));
  return {imported:data.length};
 }

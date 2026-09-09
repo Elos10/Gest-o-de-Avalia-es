@@ -1,7 +1,7 @@
 import type {FastifyInstance} from 'fastify';
 import z from 'zod';
 import {createClient} from '@supabase/supabase-js';
-import {gradeAnswers,questionCountFor,toCsv,type Choice,type RecognizedAnswer} from '@omr/core';
+import {gradeAnswers,MAX_STUDENT_IMPORT_ROWS,questionCountFor,toCsv,type Choice,type RecognizedAnswer} from '@omr/core';
 import {db} from '../db.js';
 import {config,requiredSecret} from '../config.js';
 import {authenticate,permit} from '../plugins/auth.js';
@@ -14,7 +14,7 @@ const uuid=z.string().uuid();
 const unitInput=z.object({name:z.string().trim().min(2).max(160),code:z.string().trim().max(30).optional()});
 const classInput=z.object({unitId:uuid,name:z.string().trim().min(1).max(60),grade:z.number().int().min(1).max(9),schoolYear:z.number().int().min(2020).max(2100),timeMode:z.enum(['PARTIAL','FULL'])});
 const studentInput=z.object({classId:uuid,name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional()});
-const studentImportInput=z.object({rows:z.array(z.object({name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional(),unit:z.string().trim().min(1).max(160),grade:z.number().int().min(1).max(9),className:z.string().trim().min(1).max(60),timeMode:z.enum(['PARTIAL','FULL'])})).min(1).max(2000)});
+const studentImportInput=z.object({rows:z.array(z.object({name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional(),unit:z.string().trim().min(1).max(160),grade:z.number().int().min(1).max(9),className:z.string().trim().min(1).max(60),timeMode:z.enum(['PARTIAL','FULL'])})).min(1).max(MAX_STUDENT_IMPORT_ROWS)});
 const assessmentInput=z.object({scope:z.enum(['CLASS','NETWORK']).default('CLASS'),unitId:uuid.optional(),classId:uuid.nullish(),number:z.string().trim().min(1).max(30).optional(),year:z.number().int().min(2020).max(2100),grade:z.number().int().min(1).max(9),subject:z.enum(['PORTUGUESE','MATHEMATICS','SINGLE']),timeMode:z.enum(['PARTIAL','FULL','ALL']),assessmentDate:z.string().date()});
 type UnitInput={name:string;code?:string};
 type ClassInput={unitId:string;name:string;grade:number;schoolYear:number;timeMode:'PARTIAL'|'FULL'};
