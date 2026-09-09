@@ -3,8 +3,8 @@ import {useNavigate,useParams} from 'react-router-dom';
 import {api} from '../lib/api';
 import type {Answer,Processing} from '../lib/types';
 import {Page} from '../components/Page';
+import {allowedChoices} from '@omr/core/rules';
 
-const choices=['A','B','C','D','E'];
 type Grade={id?:string;correct:number;wrong:number;blank:number;invalid:number;total:number;percentage:number;score:number};
 
 export function Review(){
@@ -16,6 +16,7 @@ export function Review(){
  async function save(){try{await api(`/api/processings/${id}/review`,{method:'PATCH',body:JSON.stringify(payload)});setMessage('Revisão salva. Os valores foram atualizados.')}catch(e){setMessage((e as Error).message)}}
  async function finalize(){if(finalizing)return;setFinalizing(true);try{await api(`/api/processings/${id}/review`,{method:'PATCH',body:JSON.stringify(payload)});const grade=await api<Grade>(`/api/processings/${id}/finalize`,{method:'POST'});setResult(grade);setMessage('Correção finalizada e resultado armazenado.')}catch(e){setMessage((e as Error).message)}finally{setFinalizing(false)}}
  if(!p)return <p>{message||'Carregando…'}</p>;
+ const choices=allowedChoices(p.sheet?.assessment.grade??1);
  const grade=result??preview;
  return <Page eyebrow="Conferência manual" title={p.sheet?.student?.name??'Gabarito processado'} description={`Avaliação ${p.sheet?.assessment.number} • alinhamento ${Math.round((p.quality?.alignment??0)*100)}%`}>
   <section className="mb-5 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">{[[grade.correct,'Acertos'],[grade.wrong,'Erros'],[grade.blank,'Brancos'],[grade.invalid,'Inválidas'],[`${grade.percentage.toLocaleString('pt-BR')}%`,'Aproveitamento'],[grade.score,'Nota']].map(([value,label])=><div className={`card !p-4 ${label==='Nota'?'bg-forest text-white':''}`} key={label}><strong className="text-2xl">{value}</strong><span className={`block text-xs ${label==='Nota'?'text-white/70':'text-black/50'}`}>{label}</span></div>)}</section>

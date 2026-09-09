@@ -5,8 +5,8 @@ import {api,download} from '../lib/api';
 import type {Assessment} from '../lib/types';
 import {subjectLabel} from '../lib/types';
 import {Page} from '../components/Page';
+import {allowedChoices} from '@omr/core/rules';
 
-const choices=['A','B','C','D','E'];
 const timeLabels={PARTIAL:'Parcial',FULL:'Integral',ALL:'Todos — parcial e integral'} as const;
 
 export function AssessmentDetail(){
@@ -20,6 +20,7 @@ export function AssessmentDetail(){
 
  useEffect(()=>{void load()},[id]);
  if(!item)return <p>{message||'Carregando…'}</p>;
+ const choices=allowedChoices(item.grade);
  const keyComplete=key.length===item.questionCount&&key.every(Boolean);
  const keySaved=keyComplete&&key.every((choice,index)=>item.key?.find(answer=>answer.question===index+1)?.choice===choice);
 

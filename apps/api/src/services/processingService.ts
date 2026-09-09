@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {recognizeAnswer,verifyQrPayload} from '@omr/core';
+import {allowedChoices,recognizeAnswer,verifyQrPayload} from '@omr/core';
 import type {Prisma} from '@prisma/client';
 import {config,requiredSecret} from '../config.js';
 import {db} from '../db.js';
@@ -21,7 +21,8 @@ async function persistSheet(result:WorkerSheetResult,userId:string,organizationI
   if(!verifyQrPayload(result.qrPayload,requiredSecret('QR_HMAC_SECRET')))throw new Error('QR_INVALID_OR_UNSIGNED');
   const sheet=await db.answerSheet.findFirst({where:{publicCode:result.qrPayload.sid,assessment:{unit:{organizationId}}},include:{assessment:true}});
   if(!sheet)throw new Error('ANSWER_SHEET_NOT_FOUND');
-  const answers=result.answers.slice(0,sheet.assessment.questionCount).map(answer=>recognizeAnswer(answer.question,answer.fills,recognitionConfig));
+  const permitted=new Set(allowedChoices(sheet.assessment.grade));
+  const answers=result.answers.slice(0,sheet.assessment.questionCount).map(answer=>recognizeAnswer(answer.question,answer.fills.filter(fill=>permitted.has(fill.choice)),recognitionConfig));
   if(answers.length!==sheet.assessment.questionCount)throw new Error('ANSWER_GRID_INCOMPLETE');
   const needsReview=answers.some(answer=>answer.status!=='MARKED'||answer.confidence<recognitionConfig.trustedConfidence);
   return db.readingProcessing.create({data:{sheetId:sheet.id,uploadedBy:userId,status:needsReview?'REVIEW_REQUIRED':'READY',storagePath:`ephemeral:${safe.sha256}`,mimeType:safe.mime,sha256:safe.sha256,algorithmVersion:'opencv-v2',quality:result.quality as Prisma.InputJsonValue,startedAt:new Date(),finishedAt:new Date(),answers:{create:answers.map(answer=>({question:answer.question,detectedChoice:answer.selected,finalChoice:answer.selected,status:answer.status,confidence:answer.confidence,fills:answer.fills as unknown as Prisma.InputJsonValue}))}},include:{answers:true,sheet:{include:{assessment:true,student:true}}}});
