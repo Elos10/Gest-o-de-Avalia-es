@@ -9,10 +9,12 @@ import {createSequentialAssessment,nextAssessmentNumber,saveAnswerKey} from '../
 import {assessmentSheetsPdf,createSheet,sheetPdf} from '../services/answerSheetService.js';
 import {processUpload} from '../services/processingService.js';
 import {importStudents} from '../services/studentService.js';
+import {importClasses} from '../services/classService.js';
 
 const uuid=z.string().uuid();
 const unitInput=z.object({name:z.string().trim().min(2).max(160),code:z.string().trim().max(30).optional()});
 const classInput=z.object({unitId:uuid,name:z.string().trim().min(1).max(60),grade:z.number().int().min(1).max(9),schoolYear:z.number().int().min(2020).max(2100),timeMode:z.enum(['PARTIAL','FULL'])});
+const classImportInput=z.object({rows:z.array(z.object({unit:z.string().trim().min(2).max(160),grade:z.number().int().min(1).max(9),name:z.string().trim().min(1).max(60),schoolYear:z.number().int().min(2020).max(2100),timeMode:z.enum(['PARTIAL','FULL'])})).min(1).max(30_000)});
 const studentInput=z.object({classId:uuid,name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional()});
 const studentImportInput=z.object({rows:z.array(z.object({name:z.string().trim().min(2).max(160),registration:z.string().trim().max(50).optional(),unit:z.string().trim().min(1).max(160),grade:z.number().int().min(1).max(9),className:z.string().trim().min(1).max(60),timeMode:z.enum(['PARTIAL','FULL'])})).min(1).max(MAX_STUDENT_IMPORT_ROWS)});
 const assessmentInput=z.object({scope:z.enum(['CLASS','NETWORK']).default('CLASS'),unitId:uuid.optional(),classId:uuid.nullish(),number:z.string().trim().min(1).max(30).optional(),year:z.number().int().min(2020).max(2100),grade:z.number().int().min(1).max(9),subject:z.enum(['PORTUGUESE','MATHEMATICS','SINGLE']),timeMode:z.enum(['PARTIAL','FULL','ALL']),assessmentDate:z.string().date()});
@@ -36,6 +38,7 @@ export async function routes(app:FastifyInstance){
 
  app.get('/api/classes',{preHandler:authenticate},r=>db.schoolClass.findMany({where:{unit:{organizationId:r.auth.organizationId}},include:{unit:true,_count:{select:{students:true}}},orderBy:[{schoolYear:'desc'},{grade:'asc'},{name:'asc'}]}));
  app.post('/api/classes',{preHandler:permit('ADMIN','MANAGER')},async r=>{const input=parseInput<ClassInput>(classInput,r.body);await requireUnit(input.unitId,r.auth.organizationId);return db.schoolClass.create({data:{unitId:input.unitId,name:input.name,grade:input.grade,schoolYear:input.schoolYear,timeMode:input.timeMode}});});
+ app.post('/api/classes/import',{preHandler:permit('ADMIN')},async r=>{const input=classImportInput.parse(r.body);return importClasses(input.rows,r.auth.organizationId);});
  app.patch('/api/classes/:id',{preHandler:permit('ADMIN')},async r=>{const id=uuid.parse((r.params as {id:string}).id),input=parseInput<ClassInput>(classInput,r.body);await requireClass(id,r.auth.organizationId);await requireUnit(input.unitId,r.auth.organizationId);return db.schoolClass.update({where:{id},data:input});});
  app.delete('/api/classes/:id',{preHandler:permit('ADMIN')},async(r,reply)=>{const id=uuid.parse((r.params as {id:string}).id),item=await db.schoolClass.findFirstOrThrow({where:{id,unit:{organizationId:r.auth.organizationId}},include:{_count:{select:{students:true,assessments:true}}}});if(item._count.students||item._count.assessments)return reply.code(409).send({message:`Não é possível excluir esta turma: existem ${item._count.students} aluno(s) e ${item._count.assessments} avaliação(ões) vinculada(s).`});await db.schoolClass.delete({where:{id}});return reply.code(204).send();});
  app.get('/api/students',{preHandler:authenticate},r=>db.student.findMany({where:{schoolClass:{unit:{organizationId:r.auth.organizationId}}},include:{schoolClass:{include:{unit:true}}},orderBy:{name:'asc'}}));

@@ -108,7 +108,7 @@ model SchoolClass {
   students    Student[]
   assessments Assessment[]
 
-  @@unique([unitId, name, schoolYear])
+  @@unique([unitId, grade, name, schoolYear, timeMode])
   @@map("school_classes")
 }
 
