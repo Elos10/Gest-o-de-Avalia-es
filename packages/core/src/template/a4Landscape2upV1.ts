@@ -4,7 +4,7 @@ export const A4_LANDSCAPE_2UP_HORIZONTAL_V1 = Object.freeze({
   id:'A4_LANDSCAPE_2UP_HORIZONTAL_V1', version:1, page:{width:297,height:210,margin:10,cutX:148.5},
   half:{width:148.5,height:210,content:{x:10,y:10,width:128.5,height:190},
     markers:[{x:13,y:13},{x:135.5,y:13},{x:135.5,y:197},{x:13,y:197}], markerSize:4,
-    qr:{x:18,y:18,size:27}, title:{x:49,y:20}, header:{x:18,y:49,width:112,height:25},
+    barcode:{x:20,y:19,width:108,height:13}, title:{x:49,y:14}, header:{x:18,y:38,width:112,height:28},
     questions:questionRows, signature:{x:18,y:177,width:112}, footerY:194
   }
 });

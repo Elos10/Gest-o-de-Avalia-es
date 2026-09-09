@@ -5,7 +5,7 @@
 - Monorepo separado em React, API Node, domínio compartilhado e worker OpenCV.
 - Regra de questões centralizada em `packages/core/src/config/assessmentRules.ts`.
 - Template imutável `A4_LANDSCAPE_2UP_HORIZONTAL_V1` usado pelo PDF e pelo OMR.
-- A4 paisagem com duas metades independentes, QR assinado e quatro marcadores por metade.
+- A4 paisagem com duas metades independentes, código de barras Code 128 assinado e quatro marcadores por metade.
 
 ## Etapa 2 - Banco, autenticação e segurança
 
@@ -26,7 +26,7 @@
 ## Etapa 4 - Leitura e correção
 
 - Upload PDF/JPEG/PNG para Storage privado.
-- Rasterização de PDF, detecção de página inteira ou meia folha, marcadores, homografia, QR e ROIs.
+- Rasterização de PDF, detecção de página inteira ou meia folha, marcadores, homografia, código de barras e ROIs.
 - Classificação de marcada, branco, múltipla e revisão por confiança.
 - Tela com original e respostas lado a lado, alteração manual auditada e finalização.
 - Correção automática em escala configurável e persistência do resultado.
@@ -40,10 +40,10 @@
 
 ## Testes e validações
 
-- 12 testes automatizados de regras, QR, branco, dupla marcação, confiança, correção, nota, PDF A4 e CSV.
+- 12 testes automatizados de regras, código de barras, branco, dupla marcação, confiança, correção, nota, PDF A4 e CSV.
 - Typecheck de todos os pacotes e build de produção.
 - Três imagens sintéticas: marca/branco/dupla, rotação de 2,5 graus e perspectiva.
-- Prova integrada com o PDF final: QR lido, quatro marcadores normalizados, alinhamento 91,24%, 20 questões e zero falso preenchimento.
+- Prova integrada com o PDF final: código de barras lido, quatro marcadores normalizados, alinhamento 91,24%, 20 questões e zero falso preenchimento.
 
 ## Publicação
 

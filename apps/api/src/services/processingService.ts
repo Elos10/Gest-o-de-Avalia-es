@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {allowedChoices,recognizeAnswer,verifyQrPayload} from '@omr/core';
+import {allowedChoices,recognizeAnswer,verifySheetCode} from '@omr/core';
 import type {Prisma} from '@prisma/client';
 import {config,requiredSecret} from '../config.js';
 import {db} from '../db.js';
@@ -17,9 +17,9 @@ async function failedProcessing(userId:string,safe:{mime:string;sha256:string},c
 
 async function persistSheet(result:WorkerSheetResult,userId:string,organizationId:string,safe:{mime:string;sha256:string}){
  try{
-  if(!result.qrPayload)throw new Error('QR_NOT_DETECTED');
-  if(!verifyQrPayload(result.qrPayload,requiredSecret('QR_HMAC_SECRET')))throw new Error('QR_INVALID_OR_UNSIGNED');
-  const sheet=await db.answerSheet.findFirst({where:{publicCode:result.qrPayload.sid,assessment:{unit:{organizationId}}},include:{assessment:true}});
+  if(!result.barcodePayload)throw new Error('BARCODE_NOT_DETECTED');
+  if(!verifySheetCode(result.barcodePayload,requiredSecret('QR_HMAC_SECRET')))throw new Error('BARCODE_INVALID_OR_UNSIGNED');
+  const sheet=await db.answerSheet.findFirst({where:{publicCode:result.barcodePayload.sid,assessment:{unit:{organizationId}}},include:{assessment:true}});
   if(!sheet)throw new Error('ANSWER_SHEET_NOT_FOUND');
   const permitted=new Set(allowedChoices(sheet.assessment.grade));
   const answers=result.answers.slice(0,sheet.assessment.questionCount).map(answer=>recognizeAnswer(answer.question,answer.fills.filter(fill=>permitted.has(fill.choice)),recognitionConfig));

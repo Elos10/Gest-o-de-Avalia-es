@@ -7,7 +7,7 @@ O projeto é um monorepo com quatro limites claros:
 - `apps/web`: React, TypeScript, Vite e Tailwind. Não contém regras escolares.
 - `apps/api`: Node.js, TypeScript e Fastify. Valida autenticação, autorização, uploads e orquestra os serviços.
 - `packages/core`: regras puras, contrato do template, reconhecimento e correção, compartilhados por API e testes.
-- `workers/omr`: OpenCV em Python para rasterização, QR, localização, perspectiva e extração de preenchimentos.
+- `workers/omr`: OpenCV em Python para rasterização, código de barras, localização, perspectiva e extração de preenchimentos.
 
 PostgreSQL/Supabase é a fonte de dados. Supabase Auth emite o JWT; a API valida o usuário com `getUser(token)`. O navegador recebe apenas URL e chave publicável. A chave secreta fica somente na API. PDFs e digitalizações ficam em buckets privados. Todas as tabelas públicas têm RLS por organização e unidade.
 
@@ -15,40 +15,40 @@ PostgreSQL/Supabase é a fonte de dados. Supabase Auth emite o JWT; a API valida
 
 1. A API valida série/disciplina e deriva a quantidade de questões em `assessmentRules`.
 2. A avaliação e o gabarito oficial são persistidos.
-3. Para cada aluno, `answerSheetService` cria um UUID opaco e assina o payload QR com HMAC.
+3. Para cada aluno, `answerSheetService` cria um UUID opaco e assina o token do código de barras com HMAC.
 4. `pdfService` desenha duas metades idênticas e independentes pela geometria de `A4_LANDSCAPE_2UP_HORIZONTAL_V1`.
 5. O upload é limitado, inspecionado por assinatura (magic bytes), armazenado em caminho não previsível e enviado ao worker.
 6. `PageLayoutDetector` distingue página A4 ou meia folha, procura quatro marcadores por metade e aplica homografia.
-7. O QR identifica o cartão. As ROIs são calculadas pelo mesmo template, nunca por coordenadas duplicadas.
+7. O código de barras identifica o cartão. As ROIs são calculadas pelo mesmo template, nunca por coordenadas duplicadas.
 8. OpenCV devolve a razão de pixels escuros no interior de cada bolha; `answerRecognitionService` classifica marcada, branca, dupla ou baixa confiança.
 9. A revisão manual preserva valor automático, valor final, autor e horário.
 10. `gradingService` corrige e persiste o resultado; `reportService` agrega e exporta CSV.
 
 ## Template determinístico
 
-`A4_LANDSCAPE_2UP_HORIZONTAL_V1` mede 297 x 210 mm, margem externa de 10 mm, corte em x=148,5 mm e duas áreas úteis de 128,5 x 190 mm. Cada metade tem quatro marcadores quadrados, QR próprio, cabeçalho, grade de respostas e assinatura. Calibri 12 é a fonte preferencial; o gerador incorpora `CALIBRI_FONT_PATH` e falha em produção se ela não existir (em desenvolvimento usa Helvetica com aviso).
+`A4_LANDSCAPE_2UP_HORIZONTAL_V1` mede 297 x 210 mm, margem externa de 10 mm, corte em x=148,5 mm e duas áreas úteis de 128,5 x 190 mm. Cada metade tem quatro marcadores quadrados, código de barras próprio, cabeçalho, grade de respostas e assinatura. Calibri 12 é a fonte preferencial; o gerador incorpora `CALIBRI_FONT_PATH` e falha em produção se ela não existir (em desenvolvimento usa Helvetica com aviso).
 
 O JSON/TypeScript do template é a fonte única de:
 
 - dimensões em milímetros;
 - centros e raios das bolhas;
-- marcadores e QR;
+- marcadores e código de barras;
 - regiões de cabeçalho/assinatura;
 - conversão para pontos PDF e pixels normalizados.
 
-A versão é gravada no QR e no banco. Templates publicados são imutáveis; mudanças criam V2. O arquivo tem exatamente duas metades lado a lado, linha tracejada de corte e nenhum elemento cruza o centro.
+A versão é gravada no código de barras e no banco. Templates publicados são imutáveis; mudanças criam V2. O arquivo tem exatamente duas metades lado a lado, linha tracejada de corte e nenhum elemento cruza o centro.
 
 ## Algoritmo OMR
 
-`PageLayoutDetector` rasteriza PDF a 300 dpi, aplica escala de cinza, CLAHE e threshold adaptativo. Ele testa orientação por QR e marcadores. Em página inteira, divide candidatos pela linha central; em meia folha, trata a imagem como um candidato. Contornos quadrados grandes perto dos cantos formam os quatro marcadores. A combinação com menor erro geométrico gera a homografia para 1285 x 1900 px (10 px/mm).
+`PageLayoutDetector` rasteriza PDF a 300 dpi, aplica escala de cinza, CLAHE e threshold adaptativo. Ele testa orientação pelo código de barras e pelos marcadores. Em página inteira, divide candidatos pela linha central; em meia folha, trata a imagem como um candidato. Contornos quadrados grandes perto dos cantos formam os quatro marcadores. A combinação com menor erro geométrico gera a homografia para 1285 x 1900 px (10 px/mm).
 
-Após a normalização, QR é lido com `QRCodeDetector`. Para cada bolha, mede-se o preenchimento em um disco interno (o contorno impresso fica fora da máscara), descontando uma mediana local. Parâmetros iniciais configuráveis: `blankThreshold=0.18`, `markedThreshold=0.42`, `doubleMarkDelta=0.10`, confiança confiável `0.90`, revisão `0.70`. Duas bolhas acima do limiar produzem `MULTIPLE`; nenhuma acima de branco produz `BLANK`; ambiguidades produzem `REVIEW`. A confiança combina distância do limiar, separação entre primeiro/segundo e qualidade dos marcadores.
+Após a normalização, o Code 128 é lido com ZXing; o `QRCodeDetector` permanece apenas para compatibilidade com folhas antigas. Para cada bolha, mede-se o preenchimento em um disco interno (o contorno impresso fica fora da máscara), descontando uma mediana local. Parâmetros iniciais configuráveis: `blankThreshold=0.18`, `markedThreshold=0.42`, `doubleMarkDelta=0.10`, confiança confiável `0.90`, revisão `0.70`. Duas bolhas acima do limiar produzem `MULTIPLE`; nenhuma acima de branco produz `BLANK`; ambiguidades produzem `REVIEW`. A confiança combina distância do limiar, separação entre primeiro/segundo e qualidade dos marcadores.
 
 ## Segurança e operação
 
 - RBAC: Administrador, Gestor, Professor e Operador; permissões são verificadas na API e em RLS.
 - Upload: 15 MB, PDF/JPEG/PNG, magic bytes, nome UUID, sem SVG/HTML, bucket privado, antivírus como etapa recomendada antes de produção.
-- QR: identificador opaco, versão, emissão e assinatura HMAC; nenhum nome de aluno.
+- Código de barras: identificador opaco, versão, emissão e assinatura HMAC; nenhum nome de aluno.
 - Logs: estado, duração, hash SHA-256, usuário, erros sanitizados e versão do algoritmo.
 - Filas: MVP síncrono com limite; interface `ProcessingQueue` permite migrar para worker assíncrono.
 - Observabilidade: request id e processing id em todos os logs.

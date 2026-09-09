@@ -5,9 +5,9 @@ import {config} from './config.js';
 import {routes} from './routes/index.js';
 
 const publicErrorMessage=(message:string)=>{
- if(message.startsWith('QR_INVALID_OR_UNSIGNED'))return 'Não foi possível validar o QR Code. Confira se a imagem pertence a uma folha gerada por este sistema e está nítida.';
- if(message.startsWith('QR_NOT_DETECTED'))return 'Os marcadores foram encontrados, mas o QR Code não pôde ser lido. Digitalize novamente com maior nitidez.';
- if(message.startsWith('ANSWER_SHEET_NOT_FOUND'))return 'O QR Code foi lido, mas a folha não foi localizada nesta organização.';
+ if(message.startsWith('BARCODE_INVALID_OR_UNSIGNED'))return 'Não foi possível validar o código de barras. Confira se a imagem pertence a uma folha gerada por este sistema e está nítida.';
+ if(message.startsWith('BARCODE_NOT_DETECTED'))return 'Os marcadores foram encontrados, mas o código de barras não pôde ser lido. Digitalize novamente com maior nitidez.';
+ if(message.startsWith('ANSWER_SHEET_NOT_FOUND'))return 'O código de barras foi lido, mas a folha não foi localizada nesta organização.';
  if(message.startsWith('NO_ELIGIBLE_STUDENTS'))return 'Nenhum aluno ativo foi encontrado para a série, o ano letivo e o tempo desta avaliação.';
  if(message.startsWith('NO_ANSWER_SHEET_FOUND')||message.includes('LAYOUT_MARKERS_NOT_FOUND'))return 'Não foi possível localizar os quatro marcadores da folha. Envie a página inteira ou uma metade sem cortes nos marcadores.';
  if(message.startsWith('OMR_WORKER'))return 'A leitura automática não conseguiu processar esta imagem. Verifique a nitidez, a orientação e tente novamente.';

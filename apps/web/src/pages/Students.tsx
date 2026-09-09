@@ -4,7 +4,7 @@ import {api} from '../lib/api';
 import type {SchoolClass,Student,Unit} from '../lib/types';
 import {downloadStudentTemplate,parseStudentCsv,type StudentImportRow} from '../lib/studentImport';
 import {Page} from '../components/Page';
-import {MAX_STUDENT_IMPORT_ROWS,STUDENT_IMPORT_BATCH_SIZE} from '@omr/core';
+import {MAX_STUDENT_IMPORT_ROWS,STUDENT_IMPORT_BATCH_SIZE} from '@omr/core/imports';
 
 const timeLabel=(value:'PARTIAL'|'FULL')=>value==='FULL'?'Integral':'Parcial';
 

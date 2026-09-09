@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
@@ -15,6 +16,11 @@ try:
     import fitz
 except ImportError:
     fitz = None
+
+try:
+    import zxingcpp
+except ImportError:
+    zxingcpp = None
 
 
 CHOICES = "ABCDE"
@@ -128,7 +134,53 @@ def normalizar_gabarito(image: np.ndarray, points: np.ndarray) -> np.ndarray:
     return cv2.warpPerspective(image, matrix, (NORMALIZED_WIDTH, NORMALIZED_HEIGHT))
 
 
-def detectar_qrcode(image: np.ndarray) -> dict | None:
+def interpretar_codigo_barras(value: str) -> dict | None:
+    if not value.startswith("S2") or "." not in value:
+        return None
+    encoded, signature = value[2:].split(".", 1)
+    if len(encoded) != 22 or len(signature) != 16:
+        return None
+    try:
+        raw = base64.urlsafe_b64decode(encoded + "==")
+    except (ValueError, TypeError):
+        return None
+    if len(raw) != 16:
+        return None
+    hex_value = raw.hex()
+    sheet_id = f"{hex_value[:8]}-{hex_value[8:12]}-{hex_value[12:16]}-{hex_value[16:20]}-{hex_value[20:]}"
+    return {"v": 2, "t": "sheet", "sid": sheet_id, "sig": signature}
+
+
+def detectar_codigo_barras(image: np.ndarray) -> dict | None:
+    """Lê Code 128 na faixa superior; o QR legado é tentado apenas por compatibilidade."""
+    barcode_roi = image[150:400, 150:1335]
+    gray = cv2.cvtColor(barcode_roi, cv2.COLOR_BGR2GRAY)
+    variants = [barcode_roi, gray, cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]]
+    variants.extend(cv2.resize(item, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC) for item in variants[:2])
+    if zxingcpp:
+        for candidate in variants:
+            for result in zxingcpp.read_barcodes(candidate, formats=zxingcpp.BarcodeFormat.Code128, try_rotate=True, try_downscale=True):
+                payload = interpretar_codigo_barras(result.text)
+                if payload:
+                    return payload
+    detector_type = getattr(cv2, "barcode_BarcodeDetector", None)
+    if detector_type:
+        detector = detector_type()
+        for candidate in variants:
+            try:
+                result = detector.detectAndDecodeWithType(candidate)
+            except (cv2.error, ValueError):
+                continue
+            decoded = result[1] if len(result) == 4 and result[0] else ()
+            values = decoded if isinstance(decoded, (tuple, list)) else [decoded]
+            for value in values:
+                payload = interpretar_codigo_barras(str(value))
+                if payload:
+                    return payload
+    return detectar_qrcode_legado(image)
+
+
+def detectar_qrcode_legado(image: np.ndarray) -> dict | None:
     qr_roi = image[150:480, 150:480]
     gray = cv2.cvtColor(qr_roi, cv2.COLOR_BGR2GRAY)
     gray = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(gray)
@@ -184,11 +236,11 @@ def processar_candidato(image: np.ndarray, page_number: int, candidate_number: i
     points = ordenar_marcadores(markers, image.shape)
     marker_confidence = validar_marcadores(points, markers, image.shape, config)
     normalized = normalizar_gabarito(image, points)
-    payload = detectar_qrcode(normalized)
+    payload = detectar_codigo_barras(normalized)
     quality = {"alignment": round(marker_confidence, 4), "markerConfidence": round(marker_confidence, 4), "pageNumber": page_number, "candidateNumber": candidate_number}
     if config.debug:
         quality["markersNorm"] = [[round(float(x / image.shape[1]), 4), round(float(y / image.shape[0]), 4)] for x, y in points]
-    return {"pageNumber": page_number, "qrPayload": payload, "quality": quality, "answers": ler_respostas(normalized, config)}
+    return {"pageNumber": page_number, "barcodePayload": payload, "quality": quality, "answers": ler_respostas(normalized, config)}
 
 
 def processar_lote(input_path: Path, config: OmrConfig) -> dict:
@@ -200,7 +252,7 @@ def processar_lote(input_path: Path, config: OmrConfig) -> dict:
         for candidate_number, candidate in enumerate(candidates, 1):
             try:
                 result = processar_candidato(candidate, page_number, candidate_number, config)
-                sheet_id = (result.get("qrPayload") or {}).get("sid")
+                sheet_id = (result.get("barcodePayload") or {}).get("sid")
                 dedupe_key = sheet_id or f"{page_number}:{candidate_number}:{result['quality']['alignment']}"
                 if dedupe_key not in seen:
                     seen.add(dedupe_key); page_results.append(result)
@@ -210,7 +262,7 @@ def processar_lote(input_path: Path, config: OmrConfig) -> dict:
             for rotation_number, candidate in enumerate((cv2.rotate(page, cv2.ROTATE_90_CLOCKWISE), cv2.rotate(page, cv2.ROTATE_90_COUNTERCLOCKWISE)), len(candidates) + 1):
                 try:
                     result = processar_candidato(candidate, page_number, rotation_number, config)
-                    sheet_id = (result.get("qrPayload") or {}).get("sid")
+                    sheet_id = (result.get("barcodePayload") or {}).get("sid")
                     dedupe_key = sheet_id or f"{page_number}:{rotation_number}:{result['quality']['alignment']}"
                     if dedupe_key not in seen:
                         seen.add(dedupe_key); page_results.append(result)

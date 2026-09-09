@@ -4,7 +4,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf
 import type { SheetData, Subject } from '../types.js';
 import { A4_LANDSCAPE_2UP_HORIZONTAL_V1 as T, mmToPt } from '../template/a4Landscape2upV1.js';
 import { allowedChoices } from '../config/assessmentRules.js';
-import { createQrPayload, qrDataUrl } from './qrCodeService.js';
+import { barcodePng, createBarcodeToken } from './barcodeService.js';
 
 const subjectLabels: Record<Subject, string> = {
   PORTUGUESE: 'Língua Portuguesa', MATHEMATICS: 'Matemática', SINGLE: 'Prova Única',
@@ -28,14 +28,14 @@ function centeredText(page: PDFPage, font: PDFFont, value: string, centerX: numb
 async function drawHalf(doc: PDFDocument, page: PDFPage, font: PDFFont, data: SheetData, offset: number, secret: string) {
   const h = T.half;
   for (const marker of h.markers) page.drawRectangle({ x: mmToPt(offset + marker.x - h.markerSize / 2), y: y(marker.y + h.markerSize / 2), width: mmToPt(h.markerSize), height: mmToPt(h.markerSize), color: rgb(0, 0, 0) });
-  const qr = await qrDataUrl(createQrPayload(data.sheetId, secret));
-  const image = await doc.embedPng(qr);
-  page.drawImage(image, { x: mmToPt(offset + h.qr.x), y: y(h.qr.y + h.qr.size), width: mmToPt(h.qr.size), height: mmToPt(h.qr.size) });
+  const token=createBarcodeToken(data.sheetId,secret);
+  const image = await doc.embedPng(await barcodePng(token));
+  page.drawImage(image, { x: mmToPt(offset + h.barcode.x), y: y(h.barcode.y + h.barcode.height), width: mmToPt(h.barcode.width), height: mmToPt(h.barcode.height) });
 
-  text(page, font, 'GABARITO DE AVALIAÇÃO', offset + 49, 20, 10);
-  text(page, font, `Nº ${data.assessmentNumber}  •  ${data.assessmentYear}`, offset + 49, 27);
-  text(page, font, `Disciplina: ${formatSheetSubject(data.subject)}`, offset + 49, 33);
-  text(page, font, `Unidade: ${data.unitName}`, offset + 49, 39);
+  centeredText(page, font, 'GABARITO DE AVALIAÇÃO', offset + 74.25, 13, 9);
+  text(page, font, `Código: ${data.sheetId.slice(0,8).toUpperCase()}`, offset + 20, 33, 5.5);
+  text(page, font, `Nº ${data.assessmentNumber}  •  ${data.assessmentYear}  •  Disciplina: ${formatSheetSubject(data.subject)}`, offset + 18, 39);
+  text(page, font, `Unidade: ${data.unitName}`, offset + 18, 45);
   text(page, font, `Aluno: ${data.studentName ?? '____________________________________'}`, offset + 18, 50);
   text(page, font, `Série: ${data.grade}º   Turma: ${data.className ?? 'Toda a rede'}   Tempo: ${formatSheetTime(data.timeMode)}`, offset + 18, 57);
   page.drawLine({ start: { x: mmToPt(offset + 18), y: y(66) }, end: { x: mmToPt(offset + 130), y: y(66) }, thickness: 0.7 });

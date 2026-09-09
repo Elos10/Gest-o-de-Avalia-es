@@ -1,4 +1,4 @@
-import {MAX_STUDENT_IMPORT_ROWS} from '@omr/core';
+import {MAX_STUDENT_IMPORT_ROWS} from '@omr/core/imports';
 
 export type StudentImportRow={name:string;registration?:string;unit:string;grade:number;className:string;timeMode:'PARTIAL'|'FULL'};
 
