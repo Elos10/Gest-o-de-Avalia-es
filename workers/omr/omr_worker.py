@@ -68,15 +68,22 @@ def carregar_paginas(path: Path) -> list[np.ndarray]:
 
 
 def detectar_gabaritos(image: np.ndarray) -> list[np.ndarray]:
-    """Gera candidatos sem assumir que a página inteira corresponde ao gabarito."""
+    """Gera candidatos para folha inteira e possíveis metades.
+
+    A4 e A5/meia A4 possuem a mesma proporção. Por isso a proporção da
+    imagem, sozinha, não permite decidir se o scanner recebeu uma página
+    inteira ou uma metade já cortada. O candidato integral precisa sempre
+    ser tentado; as divisões funcionam como alternativas para páginas 2-up.
+    """
     height, width = image.shape[:2]
+    candidates = [image]
     if width / max(height, 1) > 1.15:
         middle = width // 2
-        return [image[:, :middle], image[:, middle:]]
-    if height / max(width, 1) > 1.15:
+        candidates.extend((image[:, :middle], image[:, middle:]))
+    elif height / max(width, 1) > 1.15:
         middle = height // 2
-        return [image[:middle, :], image[middle:, :]]
-    return [image]
+        candidates.extend((image[:middle, :], image[middle:, :]))
+    return candidates
 
 
 def detectar_marcadores(image: np.ndarray, config: OmrConfig) -> list[dict]:
