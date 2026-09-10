@@ -73,7 +73,7 @@ def detectar_gabaritos(image: np.ndarray) -> list[np.ndarray]:
     if width / max(height, 1) > 1.15:
         middle = width // 2
         return [image[:, :middle], image[:, middle:]]
-    if height / max(width, 1) > 2.25:
+    if height / max(width, 1) > 1.15:
         middle = height // 2
         return [image[:middle, :], image[middle:, :]]
     return [image]
@@ -246,7 +246,14 @@ def processar_candidato(image: np.ndarray, page_number: int, candidate_number: i
     marker_confidence = validar_marcadores(points, markers, image.shape, config)
     normalized = normalizar_gabarito(image, points)
     payload = detectar_codigo_barras(normalized)
-    quality = {"alignment": round(marker_confidence, 4), "markerConfidence": round(marker_confidence, 4), "pageNumber": page_number, "candidateNumber": candidate_number}
+    orientation = 0
+    if not payload:
+        rotated = cv2.rotate(normalized, cv2.ROTATE_180)
+        payload = detectar_codigo_barras(rotated)
+        if payload:
+            normalized = rotated
+            orientation = 180
+    quality = {"alignment": round(marker_confidence, 4), "markerConfidence": round(marker_confidence, 4), "pageNumber": page_number, "candidateNumber": candidate_number, "orientation": orientation}
     if config.debug:
         quality["markersNorm"] = [[round(float(x / image.shape[1]), 4), round(float(y / image.shape[0]), 4)] for x, y in points]
     return {"pageNumber": page_number, "barcodePayload": payload, "quality": quality, "answers": ler_respostas(normalized, config)}
@@ -259,14 +266,19 @@ def processar_lote(input_path: Path, config: OmrConfig) -> dict:
         last_error = "ERRO_PARAMETRIZACAO"
         candidates = detectar_gabaritos(page)
         for candidate_number, candidate in enumerate(candidates, 1):
-            try:
-                result = processar_candidato(candidate, page_number, candidate_number, config)
-                sheet_id = (result.get("barcodePayload") or {}).get("sid")
-                dedupe_key = sheet_id or f"{page_number}:{candidate_number}:{result['quality']['alignment']}"
-                if dedupe_key not in seen:
-                    seen.add(dedupe_key); page_results.append(result)
-            except (MarkerDetectionError, RuntimeError) as error:
-                last_error = str(error)
+            orientations = [candidate]
+            if candidate.shape[1] / max(candidate.shape[0], 1) > 1.15:
+                orientations.extend((cv2.rotate(candidate, cv2.ROTATE_90_CLOCKWISE), cv2.rotate(candidate, cv2.ROTATE_90_COUNTERCLOCKWISE)))
+            for orientation_number, oriented in enumerate(orientations):
+                try:
+                    result = processar_candidato(oriented, page_number, candidate_number * 10 + orientation_number, config)
+                    sheet_id = (result.get("barcodePayload") or {}).get("sid")
+                    dedupe_key = sheet_id or f"{page_number}:{candidate_number}:{result['quality']['alignment']}"
+                    if dedupe_key not in seen:
+                        seen.add(dedupe_key); page_results.append(result)
+                    break
+                except (MarkerDetectionError, RuntimeError) as error:
+                    last_error = str(error)
         if not page_results:
             for rotation_number, candidate in enumerate((cv2.rotate(page, cv2.ROTATE_90_CLOCKWISE), cv2.rotate(page, cv2.ROTATE_90_COUNTERCLOCKWISE)), len(candidates) + 1):
                 try:
