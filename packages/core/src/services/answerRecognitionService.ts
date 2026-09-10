@@ -10,3 +10,7 @@ export function recognizeAnswer(question:number, readings:BubbleReading[], c=DEF
   const confidence=clamp(.55*((top.fill-c.blankThreshold)/(1-c.blankThreshold))+.45*((top.fill-second.fill)/(1-second.fill+.001)));
   return {question,selected:top.choice as Choice,marked:[top.choice],status:top.fill>=c.markedThreshold&&confidence>=c.reviewConfidence?'MARKED':'REVIEW',confidence,fills:readings};
 }
+
+export function requiresManualReview(answers:RecognizedAnswer[],minimumConfidence:number){
+  return answers.some(answer=>answer.status==='REVIEW'||answer.confidence<minimumConfidence);
+}

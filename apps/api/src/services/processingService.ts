@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {allowedChoices,recognizeAnswer,verifySheetCode} from '@omr/core';
+import {allowedChoices,recognizeAnswer,requiresManualReview,verifySheetCode} from '@omr/core';
 import type {Prisma} from '@prisma/client';
 import {config,requiredSecret} from '../config.js';
 import {db} from '../db.js';
@@ -27,7 +27,7 @@ async function persistSheet(result:WorkerSheetResult,userId:string,organizationI
   const permitted=new Set(allowedChoices(sheet.assessment.grade));
   const answers=result.answers.slice(0,sheet.assessment.questionCount).map(answer=>recognizeAnswer(answer.question,answer.fills.filter(fill=>permitted.has(fill.choice)),recognitionConfig));
   if(answers.length!==sheet.assessment.questionCount)throw new Error('ANSWER_GRID_INCOMPLETE');
-  const needsReview=answers.some(answer=>answer.status!=='MARKED'||answer.confidence<recognitionConfig.trustedConfidence);
+  const needsReview=requiresManualReview(answers,recognitionConfig.reviewConfidence);
   return db.readingProcessing.create({data:{sheetId:sheet.id,uploadedBy:userId,status:needsReview?'REVIEW_REQUIRED':'READY',storagePath:`ephemeral:${safe.sha256}`,mimeType:safe.mime,sha256:safe.sha256,algorithmVersion:'opencv-v2',quality:processingQuality(result.quality,upload),startedAt:new Date(),finishedAt:new Date(),answers:{create:answers.map(answer=>({question:answer.question,detectedChoice:answer.selected,finalChoice:answer.selected,status:answer.status,confidence:answer.confidence,fills:answer.fills as unknown as Prisma.InputJsonValue}))}},include:{answers:true,sheet:{include:{assessment:true,student:true}}}});
  }catch(error){return failedProcessing(userId,safe,(error as Error).message.split(':')[0],(error as Error).message,upload,result.quality as Prisma.InputJsonValue);}
 }
