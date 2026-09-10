@@ -15,7 +15,7 @@ PostgreSQL/Supabase é a fonte de dados. Supabase Auth emite o JWT; a API valida
 
 1. A API valida série/disciplina e deriva a quantidade de questões em `assessmentRules`.
 2. A avaliação e o gabarito oficial são persistidos.
-3. Para cada aluno, `answerSheetService` cria um UUID opaco e assina o token do código de barras com HMAC.
+3. Para cada aluno, `answerSheetService` cria um UUID aleatório, opaco e compacto para o código de barras.
 4. `pdfService` desenha duas metades idênticas e independentes pela geometria de `A4_LANDSCAPE_2UP_HORIZONTAL_V1`.
 5. O upload é limitado, inspecionado por assinatura (magic bytes), armazenado em caminho não previsível e enviado ao worker.
 6. `PageLayoutDetector` distingue página A4 ou meia folha, procura quatro marcadores por metade e aplica homografia.
@@ -48,7 +48,7 @@ Após a normalização, o Code 128 é lido com ZXing; o `QRCodeDetector` permane
 
 - RBAC: Administrador, Gestor, Professor e Operador; permissões são verificadas na API e em RLS.
 - Upload: 15 MB, PDF/JPEG/PNG, magic bytes, nome UUID, sem SVG/HTML, bucket privado, antivírus como etapa recomendada antes de produção.
-- Código de barras: identificador opaco, versão, emissão e assinatura HMAC; nenhum nome de aluno.
+- Código de barras: UUID aleatório e opaco, validado no banco e restrito à organização; nenhum dado pessoal do aluno.
 - Logs: estado, duração, hash SHA-256, usuário, erros sanitizados e versão do algoritmo.
 - Filas: MVP síncrono com limite; interface `ProcessingQueue` permite migrar para worker assíncrono.
 - Observabilidade: request id e processing id em todos os logs.

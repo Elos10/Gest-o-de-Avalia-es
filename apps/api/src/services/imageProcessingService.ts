@@ -5,7 +5,7 @@ import { config, requiredSecret } from '../config.js';
 
 export interface WorkerSheetResult {
   pageNumber: number;
-  barcodePayload: { v: 1 | 2; t: 'sheet'; sid: string; iat?: number; sig: string } | null;
+  barcodePayload: { v: 1 | 2 | 3; t: 'sheet'; sid: string; iat?: number; sig?: string } | null;
   quality: Record<string, number | number[][]>;
   answers: Array<{ question: number; fills: Array<{ choice: 'A' | 'B' | 'C' | 'D' | 'E'; fill: number }> }>;
 }

@@ -5,7 +5,7 @@
 - Monorepo separado em React, API Node, domínio compartilhado e worker OpenCV.
 - Regra de questões centralizada em `packages/core/src/config/assessmentRules.ts`.
 - Template imutável `A4_LANDSCAPE_2UP_HORIZONTAL_V1` usado pelo PDF e pelo OMR.
-- A4 paisagem com duas metades independentes, código de barras Code 128 assinado e quatro marcadores por metade.
+- A4 paisagem com duas metades independentes, código de barras Code 128 compacto e quatro marcadores por metade.
 
 ## Etapa 2 - Banco, autenticação e segurança
 

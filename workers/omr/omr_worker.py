@@ -135,10 +135,14 @@ def normalizar_gabarito(image: np.ndarray, points: np.ndarray) -> np.ndarray:
 
 
 def interpretar_codigo_barras(value: str) -> dict | None:
-    if not value.startswith("S2") or "." not in value:
+    value = value.strip()
+    compact = value.startswith("S3") and len(value) == 24
+    signed = value.startswith("S2") and "." in value
+    if not compact and not signed:
         return None
-    encoded, signature = value[2:].split(".", 1)
-    if len(encoded) != 22 or len(signature) != 16:
+    encoded = value[2:] if compact else value[2:].split(".", 1)[0]
+    signature = None if compact else value.rsplit(".", 1)[1]
+    if len(encoded) != 22 or (signed and len(signature or "") != 16):
         return None
     try:
         raw = base64.urlsafe_b64decode(encoded + "==")
@@ -148,15 +152,20 @@ def interpretar_codigo_barras(value: str) -> dict | None:
         return None
     hex_value = raw.hex()
     sheet_id = f"{hex_value[:8]}-{hex_value[8:12]}-{hex_value[12:16]}-{hex_value[16:20]}-{hex_value[20:]}"
-    return {"v": 2, "t": "sheet", "sid": sheet_id, "sig": signature}
+    payload = {"v": 3 if compact else 2, "t": "sheet", "sid": sheet_id}
+    if signature:
+        payload["sig"] = signature
+    return payload
 
 
 def detectar_codigo_barras(image: np.ndarray) -> dict | None:
     """Lê Code 128 na faixa superior; o QR legado é tentado apenas por compatibilidade."""
     barcode_roi = image[150:400, 150:1335]
     gray = cv2.cvtColor(barcode_roi, cv2.COLOR_BGR2GRAY)
-    variants = [barcode_roi, gray, cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]]
-    variants.extend(cv2.resize(item, None, fx=1.5, fy=1.5, interpolation=cv2.INTER_CUBIC) for item in variants[:2])
+    sharpened = cv2.addWeighted(gray, 2.0, cv2.GaussianBlur(gray, (0, 0), 1.2), -1.0, 0)
+    otsu = cv2.threshold(sharpened, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    variants = [barcode_roi, gray, sharpened, otsu]
+    variants.extend(cv2.resize(item, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST if item is otsu else cv2.INTER_CUBIC) for item in variants[1:])
     if zxingcpp:
         for candidate in variants:
             for result in zxingcpp.read_barcodes(candidate, formats=zxingcpp.BarcodeFormat.Code128, try_rotate=True, try_downscale=True):
