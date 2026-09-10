@@ -1,6 +1,6 @@
 import type { BubbleReading, Choice, RecognizedAnswer } from '../types.js';
 export interface RecognitionConfig { blankThreshold:number; markedThreshold:number; doubleMarkDelta:number; trustedConfidence:number; reviewConfidence:number }
-export const DEFAULT_RECOGNITION_CONFIG:RecognitionConfig={blankThreshold:.18,markedThreshold:.42,doubleMarkDelta:.10,trustedConfidence:.90,reviewConfidence:.70};
+export const DEFAULT_RECOGNITION_CONFIG:RecognitionConfig={blankThreshold:.18,markedThreshold:.42,doubleMarkDelta:.10,trustedConfidence:.90,reviewConfidence:.50};
 const clamp=(n:number)=>Math.max(0,Math.min(1,n));
 export function recognizeAnswer(question:number, readings:BubbleReading[], c=DEFAULT_RECOGNITION_CONFIG):RecognizedAnswer {
   const sorted=[...readings].sort((a,b)=>b.fill-a.fill), top=sorted[0], second=sorted[1];
