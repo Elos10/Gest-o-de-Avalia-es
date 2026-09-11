@@ -34,7 +34,7 @@ async function drawHalf(doc: PDFDocument, page: PDFPage, font: PDFFont, data: Sh
 
   centeredText(page, font, 'GABARITO DE AVALIAÇÃO', offset + 74.25, 13, 9);
   text(page, font, `Código: ${data.sheetId.slice(0,8).toUpperCase()}`, offset + 20, 33, 5.5);
-  text(page, font, `Nº ${data.assessmentNumber}  •  ${data.assessmentYear}  •  Disciplina: ${formatSheetSubject(data.subject)}`, offset + 18, 39);
+  text(page, font, `Avaliação: ${data.assessmentNumber}  •  ${data.assessmentYear}  •  Disciplina: ${formatSheetSubject(data.subject)}`, offset + 18, 39);
   text(page, font, `Unidade: ${data.unitName}`, offset + 18, 45);
   text(page, font, `Aluno: ${data.studentName ?? '____________________________________'}`, offset + 18, 50);
   text(page, font, `Série: ${data.grade}º   Turma: ${data.className ?? 'Toda a rede'}   Tempo: ${formatSheetTime(data.timeMode)}`, offset + 18, 57);
