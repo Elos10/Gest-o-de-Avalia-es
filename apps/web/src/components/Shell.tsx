@@ -6,7 +6,7 @@ import {supabase} from '../lib/supabase';
 const links=[['/','Visão geral',LayoutDashboard],['/avaliacoes','Avaliações',ClipboardCheck],['/leitura','Leitura de gabaritos',Camera],['/resultados','Resultados',BarChart3],['/relatorios','Relatórios',BarChart3],['/alunos','Alunos',Users],['/turmas','Turmas',GraduationCap],['/unidades','Unidades',Building2],['/configuracoes','Configurações',Settings]] as const;
 
 export function Shell(){
- const navigate=useNavigate(),[open,setOpen]=useState(false),logo=`${import.meta.env.BASE_URL}logo_semed.png`,deticLogo=`${import.meta.env.BASE_URL}logo_detic.png`;
+ const navigate=useNavigate(),[open,setOpen]=useState(false),logo=`${import.meta.env.BASE_URL}logo_semed.webp`,deticLogo=`${import.meta.env.BASE_URL}logo_detic.webp`;
  async function logout(){await supabase.auth.signOut();navigate('/login',{replace:true})}
  return <div className="min-h-screen">
   <button className="fixed right-4 top-4 z-30 rounded-xl bg-ink p-2 text-white md:hidden" onClick={()=>setOpen(!open)}>{open?<X/>:<Menu/>}</button>

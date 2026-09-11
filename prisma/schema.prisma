@@ -69,6 +69,7 @@ model Profile {
   memberships        UnitMembership[]
   createdAssessments Assessment[]     @relation("AssessmentCreator")
 
+  @@index([organizationId, active])
   @@map("profiles")
 }
 
@@ -109,6 +110,7 @@ model SchoolClass {
   assessments Assessment[]
 
   @@unique([unitId, grade, name, schoolYear, timeMode])
+  @@index([unitId, schoolYear, grade])
   @@map("school_classes")
 }
 
@@ -146,6 +148,8 @@ model Assessment {
   sheets         AnswerSheet[]
 
   @@unique([unitId, year, number, subject, classId])
+  @@index([unitId, assessmentDate])
+  @@index([classId])
   @@map("assessments")
 }
 
@@ -173,6 +177,7 @@ model AnswerSheet {
   results         Result[]
 
   @@unique([assessmentId, studentId])
+  @@index([studentId])
   @@map("answer_sheets")
 }
 
@@ -195,6 +200,7 @@ model ReadingProcessing {
   answers          StudentAnswer[]
 
   @@index([status, createdAt])
+  @@index([sheetId, createdAt])
   @@map("reading_processings")
 }
 
@@ -230,5 +236,6 @@ model Result {
   finalizedAt  DateTime    @default(now()) @map("finalized_at")
   sheet        AnswerSheet @relation(fields: [sheetId], references: [id])
 
+  @@index([sheetId, finalizedAt])
   @@map("results")
 }
