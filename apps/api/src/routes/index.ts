@@ -65,6 +65,18 @@ export async function routes(app:FastifyInstance){
 app.delete('/api/processings/:id',{preHandler:permit('ADMIN')},async(r,reply)=>{const id=uuid.parse((r.params as {id:string}).id);const processing=await db.readingProcessing.findFirst({where:{id,OR:[{sheet:{assessment:{unit:{organizationId:r.auth.organizationId}}}},{sheetId:null,uploadedBy:r.auth.userId}]},select:{id:true}});if(!processing)return reply.code(204).send();await db.$transaction([db.result.deleteMany({where:{processingId:id}}),db.readingProcessing.delete({where:{id}})]);return reply.code(204).send();});
 
  app.get('/api/results',{preHandler:authenticate},r=>db.result.findMany({where:{sheet:{assessment:{unit:{organizationId:r.auth.organizationId}}}},include:{sheet:{include:{student:{include:{schoolClass:{include:{unit:true}}}},assessment:{include:{unit:true,schoolClass:true}}}}},orderBy:{finalizedAt:'desc'}}));
+ app.get('/api/results/:id/answer-sheet',{preHandler:authenticate},async r=>{
+  const id=uuid.parse((r.params as {id:string}).id);
+  const result=await db.result.findFirstOrThrow({
+   where:{id,sheet:{assessment:{unit:{organizationId:r.auth.organizationId}}}},
+   include:{sheet:{include:{
+    student:{include:{schoolClass:{include:{unit:true}}}},
+    assessment:{include:{unit:true,schoolClass:true,key:{orderBy:{question:'asc'}}}}
+   }}}
+  });
+  const processing=await db.readingProcessing.findUniqueOrThrow({where:{id:result.processingId},include:{answers:{orderBy:{question:'asc'}}}});
+  return{result:{id:result.id,correct:result.correct,wrong:result.wrong,blank:result.blank,invalid:result.invalid,total:result.total,percentage:result.percentage,score:result.score},sheet:result.sheet,answers:processing.answers.map(answer=>{const fills=(Array.isArray(answer.fills)?answer.fills:[]) as Array<{choice:string;fill:number}>;return{question:answer.question,detectedChoice:answer.detectedChoice,finalChoice:answer.finalChoice,status:answer.status,confidence:answer.confidence,fills,markedChoices:answer.finalChoice?[answer.finalChoice]:answer.status==='MULTIPLE'?fills.filter(fill=>Number(fill.fill)>=config.OMR_MARKED_THRESHOLD).map(fill=>fill.choice):[]}})};
+ });
  app.get('/api/reports/summary',{preHandler:authenticate},async r=>{const results=await db.result.findMany({where:{sheet:{assessment:{unit:{organizationId:r.auth.organizationId}}}},include:{sheet:{include:{student:true,assessment:{include:{unit:true,schoolClass:true}}}}}});const scores=results.map(x=>Number(x.score));return{count:results.length,average:scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0,highest:scores.length?Math.max(...scores):0,lowest:scores.length?Math.min(...scores):0,results};});
  app.get('/api/reports/results.csv',{preHandler:authenticate},async(r,reply)=>{const rows=await db.result.findMany({where:{sheet:{assessment:{unit:{organizationId:r.auth.organizationId}}}},include:{sheet:{include:{student:true,assessment:{include:{unit:true,schoolClass:true}}}}}});const csv=toCsv(rows.map(x=>({aluno:x.sheet.student?.name,unidade:x.sheet.assessment.unit.name,turma:x.sheet.assessment.schoolClass?.name??'Toda a rede',avaliacao:x.sheet.assessment.number,disciplina:x.sheet.assessment.subject,acertos:x.correct,erros:x.wrong,brancos:x.blank,invalidas:x.invalid,percentual:x.percentage,nota:x.score})));return reply.type('text/csv; charset=utf-8').header('Content-Disposition','attachment; filename="resultados.csv"').send(csv);});
 }
