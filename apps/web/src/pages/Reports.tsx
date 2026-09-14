@@ -7,6 +7,7 @@ import {subjectLabel,type Result} from '../lib/types';
 type ViewMode='NETWORK'|'UNIT';
 type SummaryRow={name:string;students:number;sheets:number;correct:number;total:number;percentage:number;average:number;highest:number;lowest:number};
 const all='ALL';
+const classNameOf=(item:Result)=>item.sheet.student?.schoolClass?.name??item.sheet.assessment.schoolClass?.name??'Toda a rede';
 
 function summarize(name:string,items:Result[]):SummaryRow{
  const scores=items.map(item=>Number(item.score)),correct=items.reduce((sum,item)=>sum+item.correct,0),total=items.reduce((sum,item)=>sum+item.total,0);
@@ -14,12 +15,14 @@ function summarize(name:string,items:Result[]):SummaryRow{
 }
 
 export function Reports(){
- const [items,setItems]=useState<Result[]>([]),[mode,setMode]=useState<ViewMode>('NETWORK'),[assessment,setAssessment]=useState(all),[grade,setGrade]=useState(all),[subject,setSubject]=useState(all),[message,setMessage]=useState('');
+ const [items,setItems]=useState<Result[]>([]),[mode,setMode]=useState<ViewMode>('NETWORK'),[assessment,setAssessment]=useState(all),[grade,setGrade]=useState(all),[schoolClass,setSchoolClass]=useState(all),[subject,setSubject]=useState(all),[message,setMessage]=useState('');
  useEffect(()=>{api<Result[]>('/api/results').then(setItems).catch(error=>setMessage(error.message))},[]);
  const assessmentOptions=useMemo(()=>[...new Set(items.map(item=>item.sheet.assessment.number))].sort(),[items]);
  const gradeOptions=useMemo(()=>[...new Set(items.map(item=>item.sheet.assessment.grade))].sort((a,b)=>a-b),[items]);
  const subjectOptions=useMemo(()=>[...new Set(items.map(item=>item.sheet.assessment.subject))].sort(),[items]);
- const filtered=useMemo(()=>items.filter(item=>(assessment===all||item.sheet.assessment.number===assessment)&&(grade===all||item.sheet.assessment.grade===Number(grade))&&(subject===all||item.sheet.assessment.subject===subject)),[items,assessment,grade,subject]);
+ const classOptions=useMemo(()=>[...new Set(items.filter(item=>(assessment===all||item.sheet.assessment.number===assessment)&&(grade===all||item.sheet.assessment.grade===Number(grade))&&(subject===all||item.sheet.assessment.subject===subject)).map(classNameOf))].sort((a,b)=>a.localeCompare(b,'pt-BR',{numeric:true})),[items,assessment,grade,subject]);
+ useEffect(()=>{if(schoolClass!==all&&!classOptions.includes(schoolClass))setSchoolClass(all)},[classOptions,schoolClass]);
+ const filtered=useMemo(()=>items.filter(item=>(assessment===all||item.sheet.assessment.number===assessment)&&(grade===all||item.sheet.assessment.grade===Number(grade))&&(schoolClass===all||classNameOf(item)===schoolClass)&&(subject===all||item.sheet.assessment.subject===subject)),[items,assessment,grade,schoolClass,subject]);
  const rows=useMemo(()=>{
   if(mode==='NETWORK')return[summarize('Rede Municipal de Ensino',filtered)];
   const groups=new Map<string,Result[]>();
@@ -27,7 +30,7 @@ export function Reports(){
   return[...groups.entries()].sort(([a],[b])=>a.localeCompare(b,'pt-BR')).map(([name,results])=>summarize(name,results));
  },[filtered,mode]);
  const totals=useMemo(()=>summarize('Total',filtered),[filtered]);
- const filterDescription=`Avaliação: ${assessment===all?'Todas':assessment} | Série: ${grade===all?'Todas':`${grade}º ano`} | Disciplina: ${subject===all?'Todas':subjectLabel(subject)}`;
+ const filterDescription=`Avaliação: ${assessment===all?'Todas':assessment} | Série: ${grade===all?'Todas':`${grade}º ano`} | Turma: ${schoolClass===all?'Todas':schoolClass} | Disciplina: ${subject===all?'Todas':subjectLabel(subject)}`;
  function printReport(){document.body.classList.add('report-printing');const cleanup=()=>document.body.classList.remove('report-printing');window.addEventListener('afterprint',cleanup,{once:true});window.print();setTimeout(cleanup,1500)}
  return <Page eyebrow="Análise" title="Relatórios" description="Selecione a visão e os filtros para consultar ou imprimir o desempenho.">
   <section className="report-controls card mb-5">
@@ -35,9 +38,10 @@ export function Reports(){
     <button className={`rounded-2xl border p-5 text-left transition ${mode==='NETWORK'?'border-forest bg-mint text-forest':'hover:border-forest/40'}`} onClick={()=>setMode('NETWORK')}><BarChart3 className="mb-3"/><strong className="block text-lg">Desempenho Geral da Rede</strong><span className="text-sm opacity-70">Consolida todas as unidades selecionadas.</span></button>
     <button className={`rounded-2xl border p-5 text-left transition ${mode==='UNIT'?'border-forest bg-mint text-forest':'hover:border-forest/40'}`} onClick={()=>setMode('UNIT')}><Building2 className="mb-3"/><strong className="block text-lg">Desempenho por Unidade</strong><span className="text-sm opacity-70">Compara cada unidade educacional.</span></button>
    </div>
-   <div className="mt-5 grid gap-4 md:grid-cols-3">
+   <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <label><span className="label">Avaliação</span><select className="field" value={assessment} onChange={event=>setAssessment(event.target.value)}><option value={all}>Todas</option>{assessmentOptions.map(value=><option value={value} key={value}>{value}</option>)}</select></label>
     <label><span className="label">Série</span><select className="field" value={grade} onChange={event=>setGrade(event.target.value)}><option value={all}>Todas</option>{gradeOptions.map(value=><option value={value} key={value}>{value}º ano</option>)}</select></label>
+    <label><span className="label">Turma</span><select className="field" value={schoolClass} onChange={event=>setSchoolClass(event.target.value)}><option value={all}>Todas</option>{classOptions.map(value=><option value={value} key={value}>{value}</option>)}</select></label>
     <label><span className="label">Disciplina</span><select className="field" value={subject} onChange={event=>setSubject(event.target.value)}><option value={all}>Todas</option>{subjectOptions.map(value=><option value={value} key={value}>{subjectLabel(value)}</option>)}</select></label>
    </div>
    <div className="mt-5 flex justify-end"><button className="btn inline-flex items-center gap-2" disabled={!filtered.length} onClick={printReport}><Printer size={18}/> Imprimir / Salvar PDF</button></div>
