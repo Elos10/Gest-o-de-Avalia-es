@@ -1,1 +1,1 @@
-/** @type {import('tailwindcss').Config} */ export default {content:['./index.html','./src/**/*.{ts,tsx}'],theme:{extend:{colors:{ink:'#15231f',forest:'#1f5c47',mint:'#dcebe3',paper:'#f5f3ed',amber:'#d69e48'}}},plugins:[]};
+/** @type {import('tailwindcss').Config} */ export default {content:['./index.html','./src/**/*.{ts,tsx}'],theme:{extend:{colors:{ink:'#1d376f',forest:'#355bb1',mint:'#e3ebfb',paper:'#f2f5fb',amber:'#d39a3c'}}},plugins:[]};
